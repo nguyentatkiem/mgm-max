@@ -18,9 +18,17 @@ export async function tongQuan(chienDichId: number): Promise<SoLieuTongQuan> {
   const coShare = Number((await mot(`select count(distinct nguoi_id) as so from so_diem where chien_dich_id=$1 and hanh_dong='share'`, [chienDichId]))?.so || 0);
   const coMoiThanhCong = Number((await mot(`select count(distinct nguoi_moi_id) as so from gioi_thieu where chien_dich_id=$1 and trang_thai='xac_minh'`, [chienDichId]))?.so || 0);
   const kenh = await q(
-    `select coalesce(nullif(c.kenh,''),'khac') as kenh, count(*) as clicks,
-            (select count(*) from nguoi_tham_gia n2 where n2.chien_dich_id=$1 and n2.kenh_vao=coalesce(nullif(c.kenh,''),'khac')) as dangky
-     from click_link c join nguoi_tham_gia n on n.ma=c.ma where n.chien_dich_id=$1 group by 1 order by 2 desc`,
+    `select k.kenh, k.clicks, coalesce(d.dangky, 0) as dangky
+     from (
+       select coalesce(nullif(c.kenh,''),'khac') as kenh, count(*) as clicks
+       from click_link c join nguoi_tham_gia n on n.ma=c.ma
+       where n.chien_dich_id=$1 group by 1
+     ) k
+     left join (
+       select coalesce(nullif(kenh_vao,''),'khac') as kenh, count(*) as dangky
+       from nguoi_tham_gia where chien_dich_id=$1 group by 1
+     ) d on d.kenh = k.kenh
+     order by k.clicks desc`,
     [chienDichId]
   );
   const topNguoiMoi = await q(

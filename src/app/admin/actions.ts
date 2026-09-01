@@ -391,6 +391,13 @@ export async function actTaoTuMauToanDien(form: FormData) {
       [cd!.id, nv.ten, nv.moTa, nv.url, nv.diem, nv.cauHoi, nv.dapAn]
     );
   }
+  for (const em of m.email || []) {
+    await q(
+      `insert into mau_email (chien_dich_id, loai, tieu_de, noi_dung) values ($1,$2,$3,$4)
+       on conflict (chien_dich_id, loai) do update set tieu_de=excluded.tieu_de, noi_dung=excluded.noi_dung`,
+      [cd!.id, em.loai, em.tieuDe, em.noiDung]
+    );
+  }
   redirect(`/admin/cd/${cd!.id}/thiet-lap/trang-dang-ky`);
 }
 

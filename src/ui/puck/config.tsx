@@ -1,5 +1,6 @@
 import type { Config, Data } from "@puckeditor/core";
 import DemNguoc from "@/ui/DemNguoc";
+import VongQuay from "./VongQuay";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Cấu hình Puck cho TRÌNH KÉO-THẢ trang đăng ký của MGM MAX.
@@ -68,6 +69,8 @@ type Blocks = {
   MocQua: { tieuDe: string };
   SoNguoi: { chuThich: string };
   DieuKhoan: Record<string, never>;
+  BacGia: { tieuDe: string; bac: { so: number; gia: string; ghi: string }[] };
+  VongQuay: { tieuDe: string; giaiThuong: { ten: string }[] };
 };
 
 export const config: Config<Blocks, { mauNen: string; mauChinh: string }> = {
@@ -318,6 +321,78 @@ export const config: Config<Blocks, { mauNen: string; mauChinh: string }> = {
             <summary style={{ cursor: "pointer", fontWeight: 700, color: "#334155", fontSize: 14 }}>{md.dieuKhoanTieuDe || "Thể lệ & điều khoản chương trình"}</summary>
             <div style={{ marginTop: 12, whiteSpace: "pre-wrap", fontSize: 14, color: "#475569" }}>{md.dieuKhoan}</div>
           </details>
+        );
+      },
+    },
+
+    BacGia: {
+      label: "Bậc giá mua chung",
+      fields: {
+        tieuDe: { type: "text", label: "Tiêu đề" },
+        bac: {
+          type: "array",
+          label: "Các bậc giá (theo tổng số người)",
+          arrayFields: { so: { type: "number", label: "Từ số người" }, gia: { type: "text", label: "Giá" }, ghi: { type: "text", label: "Ghi chú" } },
+          getItemSummary: (it: { so?: number; gia?: string }) => `${it.so ?? "?"} người → ${it.gia ?? ""}`,
+        },
+      },
+      defaultProps: {
+        tieuDe: "Càng đông — giá càng giảm",
+        bac: [
+          { so: 1, gia: "990k", ghi: "giá lẻ" }, { so: 10, gia: "790k", ghi: "" },
+          { so: 30, gia: "590k", ghi: "" }, { so: 50, gia: "490k", ghi: "tốt nhất" },
+        ],
+      },
+      render: ({ tieuDe, bac, puck }) => {
+        const md = lay(puck);
+        const list = bac || [];
+        const datIdx = list.reduce((acc, b, i) => (md.soThamGia >= (Number(b.so) || 0) ? i : acc), -1);
+        return (
+          <div style={{ background: "#fff", borderRadius: 16, padding: 20, margin: "14px 0" }}>
+            <h3 style={{ margin: "0 0 4px", fontWeight: 800, color: "#0f172a" }}>{tieuDe}</h3>
+            <div style={{ fontSize: 13, color: "#64748b", marginBottom: 12 }}>Hiện có <b>{md.soThamGia}</b> người tham gia — rủ thêm để chốt mức tốt hơn!</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {list.map((b, i) => (
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 12,
+                  background: i === datIdx ? md.mau : "#f8fafc", color: i === datIdx ? "#fff" : "#334155",
+                  fontWeight: i === datIdx ? 800 : 500, border: i === datIdx ? "none" : "1px solid #e2e8f0",
+                }}>
+                  <span>Từ {b.so} người{b.ghi ? ` · ${b.ghi}` : ""}</span>
+                  <span style={{ fontWeight: 800 }}>{b.gia}{i === datIdx ? " ✓" : ""}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      },
+    },
+
+    VongQuay: {
+      label: "Vòng quay may mắn",
+      fields: {
+        tieuDe: { type: "text", label: "Tiêu đề" },
+        giaiThuong: {
+          type: "array",
+          label: "Ô giải thưởng (2–8 ô)",
+          arrayFields: { ten: { type: "text", label: "Tên giải" } },
+          getItemSummary: (it: { ten?: string }) => it.ten || "Giải",
+        },
+      },
+      defaultProps: {
+        tieuDe: "🎡 Mỗi lượt mời = 1 lượt quay",
+        giaiThuong: [
+          { ten: "Voucher 10%" }, { ten: "Ebook tặng" }, { ten: "Voucher 20%" },
+          { ten: "Chúc may mắn" }, { ten: "Quà bí ẩn" }, { ten: "Freeship" },
+        ],
+      },
+      render: ({ tieuDe, giaiThuong, puck }) => {
+        const md = lay(puck);
+        return (
+          <div style={{ margin: "14px 0" }}>
+            {tieuDe ? <h3 style={{ textAlign: "center", color: "#ffffff", fontWeight: 900, fontSize: 18, margin: "0 0 4px" }}>{tieuDe}</h3> : null}
+            <VongQuay giaiThuong={(giaiThuong || []).map((g) => g.ten)} mau={md.mau} />
+          </div>
         );
       },
     },

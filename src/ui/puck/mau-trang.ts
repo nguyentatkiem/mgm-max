@@ -29,6 +29,8 @@ export const K = {
   mocQua: (tieuDe = "🎁 Mời càng nhiều — quà càng lớn") => ({ type: "MocQua", props: { tieuDe } }),
   soNguoi: (chuThich = "người đã tham gia") => ({ type: "SoNguoi", props: { chuThich } }),
   dieuKhoan: () => ({ type: "DieuKhoan", props: {} }),
+  bacGia: (tieuDe: string, bac: { so: number; gia: string; ghi: string }[]) => ({ type: "BacGia", props: { tieuDe, bac } }),
+  vongQuay: (tieuDe: string, giai: string[]) => ({ type: "VongQuay", props: { tieuDe, giaiThuong: giai.map((ten) => ({ ten })) } }),
 };
 
 export type MauTrang = { ma: string; ten: string; emoji: string; moTa: string; data: Data };

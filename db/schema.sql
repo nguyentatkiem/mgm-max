@@ -185,6 +185,8 @@ alter table chien_dich add column if not exists khu_vuc          text not null d
 alter table chien_dich add column if not exists email_tat        jsonb not null default '{}';
 alter table chien_dich add column if not exists ma_header_dang_ky text not null default '';
 alter table chien_dich add column if not exists ma_header_chia_se text not null default '';
+-- Trình kéo-thả (Puck): thiết kế trang đăng ký dạng block, lưu JSON. Rỗng '{}' = dùng giao diện mặc định.
+alter table chien_dich add column if not exists layout_json     jsonb not null default '{}';
 
 create table if not exists theo_doi_nguon (
   id            serial primary key,

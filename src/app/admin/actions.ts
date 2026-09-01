@@ -360,6 +360,26 @@ export async function actSuaEditor(form: FormData) {
   revalidatePath(`/admin/editor/${id}`);
 }
 
+// Trình kéo-thả (Puck): xuất bản data JSON của trang đăng ký.
+export async function actLuuLayout(id: number, data: unknown) {
+  await canAdmin();
+  await q(`update chien_dich set layout_json=$2::jsonb where id=$1`, [id, JSON.stringify(data || {})]);
+  const cd = await mot<{ slug: string }>(`select slug from chien_dich where id=$1`, [id]);
+  if (cd) revalidatePath(`/c/${cd.slug}`);
+  revalidatePath(`/admin/editor/${id}`);
+  revalidatePath(`/admin/cd/${id}/thiet-lap/trang-dang-ky`);
+}
+
+// Xoá thiết kế kéo-thả → trang quay về giao diện mặc định.
+export async function actXoaLayout(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  await q(`update chien_dich set layout_json='{}'::jsonb where id=$1`, [id]);
+  const cd = await mot<{ slug: string }>(`select slug from chien_dich where id=$1`, [id]);
+  if (cd) revalidatePath(`/c/${cd.slug}`);
+  revalidatePath(`/admin/cd/${id}/thiet-lap/trang-dang-ky`);
+}
+
 export async function actSuaTrangDong(form: FormData) {
   await canAdmin();
   const id = Number(form.get("id"));

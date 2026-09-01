@@ -8,6 +8,8 @@ import { layIp } from "@/services/http";
 import { soDangKyIpHomNay } from "@/services/nguoi-tham-gia";
 import { taoCaptcha, NGUONG_CAPTCHA } from "@/services/captcha";
 import DemNguoc from "@/ui/DemNguoc";
+import { Render } from "@puckeditor/core/rsc";
+import { config, coLayout, type MetaTrang } from "@/ui/puck/config";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +75,29 @@ export default async function TrangDangKy(props: {
 
   const mau = cd.mau_chinh || "#2563eb";
   const nenDuoi = cd.mau_nen || "#f8fafc";
+
+  // Nếu admin đã thiết kế bằng trình KÉO-THẢ (Puck) → render layout đó thay giao diện mặc định.
+  if (coLayout(cd.layout_json)) {
+    const md: MetaTrang = {
+      slug: cd.slug, cdId: cd.id, mau, nenDuoi,
+      nutCta: cd.nut_cta || "Đăng ký nhận quà ngay",
+      ref, kenh: src, loi,
+      truongThem,
+      captcha: captcha ? { token: captcha.token, cauHoi: captcha.cauHoi } : null,
+      soThamGia: Number(soThamGia?.so || 0),
+      cacMoc: cacMoc.map((m) => ({ nguong: m.nguong, tenQua: m.ten_qua })),
+      giaiBocTham: cd.giai_boc_tham || "",
+      dieuKhoan: cd.dieu_khoan || "",
+      dieuKhoanTieuDe: cd.dieu_khoan_tieu_de || "",
+      ketThuc: cd.ket_thuc_luc ? new Date(cd.ket_thuc_luc).toISOString() : "",
+    };
+    return (
+      <main style={{ minHeight: "100vh" }}>
+        {cd.ma_header_dang_ky && <ChenMa ma={cd.ma_header_dang_ky} />}
+        <Render config={config} data={cd.layout_json} metadata={md as unknown as Record<string, unknown>} />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-50" style={{ background: `linear-gradient(180deg, ${mau} 0%, ${mau}cc 38%, ${nenDuoi} 62%)` }}>

@@ -1,138 +1,109 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Download, MousePointerClick, ShieldAlert, TrendingUp, UserCheck, UserPlus, Users } from "lucide-react";
-import { q, mot } from "@/db";
-import { theoNgay, tongQuan } from "@/services/thong-ke";
-import BieuDoNgay from "@/ui/BieuDoNgay";
+import { AlertTriangle, CalendarClock, Copy, Eye, Gift, MousePointerClick, Plus, Trophy, UserPlus, Users } from "lucide-react";
+import { mot, q } from "@/db";
 import { yeuCauAdmin } from "./bao-ve";
+import { actCloneChienDich, actDoiTrangThai } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function TrangTongQuan(props: { searchParams: Promise<{ cd?: string }> }) {
-  await yeuCauAdmin();
-  const { cd: cdQuery } = await props.searchParams;
-  const cacCd = await q(`select id, ten, slug, trang_thai from chien_dich order by id desc`);
-  if (!cacCd.length) {
-    return (
-      <div className="the mx-auto max-w-lg p-8 text-center">
-        <h1 className="text-xl font-black text-slate-900">Chưa có chiến dịch nào</h1>
-        <Link href="/admin/chien-dich/moi" className="nut-chinh mt-4">Tạo chiến dịch đầu tiên</Link>
-      </div>
-    );
-  }
-  const cd = (cdQuery && cacCd.find((c) => String(c.id) === cdQuery)) || cacCd[0];
-  const s = await tongQuan(cd.id);
-  const duLieuNgay = await theoNgay(cd.id, 14);
-  const emailCho = await mot<{ so: string }>(`select count(*) as so from hang_doi_email where trang_thai='cho'`);
+const MAU_TT: Record<string, string> = {
+  nhap: "bg-slate-100 text-slate-600", chay: "bg-emerald-100 text-emerald-700",
+  tam_dung: "bg-amber-100 text-amber-700", dong: "bg-red-100 text-red-700",
+};
+const TEN_TT: Record<string, string> = { nhap: "Nháp", chay: "Đang chạy", tam_dung: "Tạm dừng", dong: "Đã đóng" };
 
-  const buoc = [
-    { ten: "Click link mời", so: s.clicks, icon: MousePointerClick },
-    { ten: "Đăng ký", so: s.dangKy, icon: UserPlus },
-    { ten: "Xác minh email", so: s.xacMinh, icon: UserCheck },
-    { ten: "Có share", so: s.coShare, icon: Users },
-    { ten: "Mời ≥1 bạn", so: s.coMoiThanhCong, icon: TrendingUp },
-  ];
+export default async function TongQuanTaiKhoan() {
+  await yeuCauAdmin();
+  const tong = await mot(
+    `select (select count(*) from click_link) as ghe,
+            (select count(*) from nguoi_tham_gia where xac_minh) as lead,
+            (select count(*) from nguoi_tham_gia where xac_minh and nguoi_moi_id is not null) as gioithieu`);
+  const cacCd = await q(
+    `select c.*,
+       (select count(*) from nguoi_tham_gia n where n.chien_dich_id=c.id and n.xac_minh) as so_lead,
+       (select count(*) from click_link k join nguoi_tham_gia n2 on n2.ma=k.ma where n2.chien_dich_id=c.id) as so_ghe,
+       (select count(*) from moc_qua m where m.chien_dich_id=c.id) as so_moc
+     from chien_dich c order by c.id desc`);
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900">Tổng quan</h1>
-          <p className="text-sm text-slate-500">Chiến dịch: <b>{cd.ten}</b></p>
-        </div>
-        <div className="flex items-center gap-2">
-          <form method="get" className="flex items-center gap-2">
-            <select name="cd" defaultValue={cd.id} className="o-nhap !w-auto !py-2 text-sm">
-              {cacCd.map((c) => <option key={c.id} value={c.id}>{c.ten}</option>)}
-            </select>
-            <button className="nut-phu !py-2 text-sm">Xem</button>
-          </form>
-          <a href={`/api/admin/csv?cd=${cd.id}`} className="nut-phu !py-2 text-sm"><Download className="h-4 w-4" /> CSV</a>
-        </div>
-      </div>
-
-      {(s.choDuyet > 0 || s.khoQuaSapHet.length > 0 || Number(emailCho?.so || 0) > 0) && (
-        <div className="mt-4 space-y-2">
-          {s.choDuyet > 0 && (
-            <Link href="/admin/lead?tab=cach-ly" className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800">
-              <ShieldAlert className="h-4 w-4" /> {s.choDuyet} referral đang chờ duyệt trong khu cách ly <ArrowRight className="h-4 w-4" />
-            </Link>
-          )}
-          {s.khoQuaSapHet.map((k) => (
-            <div key={k.ten_qua} className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700">
-              <AlertTriangle className="h-4 w-4" /> Kho mã «{k.ten_qua}» chỉ còn {k.con} mã — nạp thêm ngay!
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Chỉ số chính */}
-      <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <main className="mx-auto max-w-6xl px-4 py-6">
+      {/* 3 chỉ số tài khoản */}
+      <div className="the grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         {[
-          { ten: "Hệ số viral K", so: s.k === Infinity ? "∞" : s.k, mota: "K > 1 = tự tăng trưởng", noiBat: true },
-          { ten: "Tỉ lệ xác minh", so: `${s.ptXacMinh}%`, mota: "xác minh / đăng ký" },
-          { ten: "Lead từ giới thiệu", so: `${s.ptTuGioiThieu}%`, mota: `${s.tuGioiThieu}/${s.xacMinh} người` },
-          { ten: "Tổng xác minh", so: s.xacMinh, mota: `${s.dangKy} đăng ký` },
+          { ten: "Tổng lượt ghé", so: Number(tong?.ghe || 0), icon: MousePointerClick },
+          { ten: "Tổng người xác minh", so: Number(tong?.lead || 0), icon: Users },
+          { ten: "Lead từ giới thiệu", so: Number(tong?.gioithieu || 0), icon: UserPlus },
         ].map((o) => (
-          <div key={o.ten} className={`the p-5 ${o.noiBat ? "!border-blue-300 !bg-blue-50/50" : ""}`}>
-            <div className="text-sm font-semibold text-slate-500">{o.ten}</div>
-            <div className={`mt-1 text-3xl font-black ${o.noiBat ? "text-blue-700" : "text-slate-900"}`}>{o.so}</div>
-            <div className="mt-0.5 text-xs text-slate-400">{o.mota}</div>
+          <div key={o.ten} className="flex items-center gap-4 p-5">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><o.icon className="h-6 w-6" /></span>
+            <div>
+              <div className="text-2xl font-black text-slate-900">{o.so}</div>
+              <div className="text-sm text-slate-500">{o.ten}</div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* F43 — biểu đồ theo ngày */}
-      <div className="the mt-6 p-6">
-        <BieuDoNgay duLieu={duLieuNgay} />
+      {/* Danh sách chiến dịch */}
+      <div className="mt-8 flex items-center justify-between">
+        <h1 className="text-xl font-black text-slate-900">{cacCd.length} Chương trình &amp; Chiến dịch</h1>
+        <Link href="/admin/moi" className="nut-chinh"><Plus className="h-4 w-4" /> Chiến dịch mới</Link>
       </div>
 
-      {/* Phễu */}
-      <div className="the mt-6 p-6">
-        <h2 className="font-bold text-slate-900">Phễu chuyển đổi</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-5">
-          {buoc.map((b, i) => (
-            <div key={b.ten} className="relative rounded-xl bg-slate-50 p-4 text-center">
-              <b.icon className="mx-auto h-5 w-5 text-blue-600" />
-              <div className="mt-1 text-2xl font-black text-slate-900">{b.so}</div>
-              <div className="text-xs font-medium text-slate-500">{b.ten}</div>
-              {i > 0 && buoc[i - 1].so > 0 && (
-                <div className="mt-1 text-xs font-bold text-blue-600">{Math.round((b.so / buoc[i - 1].so) * 100)}%</div>
-              )}
+      <div className="mt-4 space-y-4">
+        {cacCd.length === 0 && (
+          <div className="the p-10 text-center text-slate-500">
+            Chưa có chiến dịch nào. <Link className="font-bold text-blue-700" href="/admin/moi">Tạo chiến dịch đầu tiên →</Link>
+          </div>
+        )}
+        {cacCd.map((cd) => {
+          const thieuCauHinh = Number(cd.so_moc) === 0 && !cd.giai_boc_tham;
+          return (
+            <div key={cd.id} className="the flex flex-wrap items-center gap-4 p-4">
+              {/* thumbnail mini của trang đăng ký */}
+              <Link href={`/admin/cd/${cd.id}/tong-quan`}
+                className="flex h-24 w-40 shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl px-2 text-center"
+                style={{ background: `linear-gradient(160deg, ${cd.mau_chinh || "#2563eb"}, ${cd.mau_chinh || "#2563eb"}99)` }}>
+                <span className="line-clamp-2 text-[10px] font-bold leading-tight text-white">{cd.tieu_de_trang || cd.ten}</span>
+                <span className="rounded-full bg-white/90 px-2 py-0.5 text-[8px] font-bold" style={{ color: cd.mau_chinh || "#2563eb" }}>{cd.nut_cta || "Đăng ký nhận quà"}</span>
+              </Link>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link href={`/admin/cd/${cd.id}/tong-quan`} className="truncate text-lg font-black text-slate-900 hover:text-blue-700">{cd.ten}</Link>
+                  <span className={`hieu ${MAU_TT[cd.trang_thai]}`}>{TEN_TT[cd.trang_thai]}</span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {cd.giai_boc_tham && <span className="hieu bg-slate-100 text-slate-600"><Trophy className="h-3 w-3" /> Giải đặc biệt</span>}
+                  {Number(cd.so_moc) > 0 && <span className="hieu bg-slate-100 text-slate-600"><Gift className="h-3 w-3" /> {cd.so_moc} mốc quà</span>}
+                  {cd.hai_chieu && <span className="hieu bg-slate-100 text-slate-600"><UserPlus className="h-3 w-3" /> Thưởng 2 chiều</span>}
+                  <span className="hieu bg-slate-100 text-slate-600"><CalendarClock className="h-3 w-3" /> {new Date(cd.tao_luc).toLocaleDateString("vi-VN")}</span>
+                </div>
+                {thieuCauHinh && (
+                  <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
+                    <AlertTriangle className="h-3.5 w-3.5" /> Chiến dịch chưa có mốc quà hoặc giải — <Link className="underline" href={`/admin/cd/${cd.id}/thiet-lap/moc-qua`}>bổ sung ngay</Link>
+                  </div>
+                )}
+                <div className="mt-1.5 text-xs text-slate-400">/c/{cd.slug}</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div className="rounded-xl border border-slate-200 px-4 py-2"><div className="text-lg font-black text-slate-900">{Number(cd.so_ghe)}</div><div className="text-[10px] text-slate-400">Lượt ghé</div></div>
+                  <div className="rounded-xl border border-slate-200 px-4 py-2"><div className="text-lg font-black text-blue-700">{Number(cd.so_lead)}</div><div className="text-[10px] text-slate-400">Lead</div></div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <a href={`/c/${cd.slug}`} target="_blank" className="nut-phu !px-2.5 !py-1.5 text-xs" title="Xem trang"><Eye className="h-3.5 w-3.5" /></a>
+                  <form action={actCloneChienDich}><input type="hidden" name="id" value={cd.id} />
+                    <button className="nut-phu !px-2.5 !py-1.5 text-xs" title="Nhân bản"><Copy className="h-3.5 w-3.5" /></button></form>
+                  {cd.trang_thai === "chay" && (
+                    <form action={actDoiTrangThai}><input type="hidden" name="id" value={cd.id} /><input type="hidden" name="trang_thai" value="tam_dung" />
+                      <button className="nut-phu !px-2.5 !py-1.5 text-[10px]">Dừng</button></form>
+                  )}
+                </div>
+              </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        {/* Kênh share */}
-        <div className="the p-6">
-          <h2 className="font-bold text-slate-900">Hiệu quả kênh share</h2>
-          {s.kenh.length === 0 && <p className="mt-3 text-sm text-slate-400">Chưa có click nào qua link mời.</p>}
-          <ul className="mt-3 space-y-2">
-            {s.kenh.map((k) => (
-              <li key={k.kenh} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 text-sm">
-                <span className="font-semibold capitalize text-slate-700">{k.kenh}</span>
-                <span className="text-slate-500">{k.clicks} click · <b className="text-blue-700">{k.dangKy} đăng ký</b></span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        {/* Top người mời */}
-        <div className="the p-6">
-          <h2 className="font-bold text-slate-900">Top người ảnh hưởng</h2>
-          {s.topNguoiMoi.length === 0 && <p className="mt-3 text-sm text-slate-400">Chưa có ai mời thành công.</p>}
-          <ul className="mt-3 space-y-2">
-            {s.topNguoiMoi.filter((t) => t.soBan > 0).map((t, i) => (
-              <li key={t.id}>
-                <Link href={`/admin/lead/${t.id}`} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 text-sm hover:bg-blue-50">
-                  <span className="font-semibold text-slate-700">#{i + 1} {t.ten} <span className="font-normal text-slate-400">({t.email})</span></span>
-                  <span className="text-slate-500"><b className="text-blue-700">{t.soBan} bạn</b> · {t.diem}đ</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
+    </main>
   );
 }

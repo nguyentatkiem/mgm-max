@@ -26,10 +26,17 @@ export async function soDangKyIpHomNay(chienDichId: number, ip: string): Promise
 
 export async function dangKy(tham: {
   slug: string; ten: string; email: string; maNguoiMoi: string; kenh: string; ip: string; ua: string; baseUrl: string;
-  duLieuThem?: Record<string, string>; captchaHopLe?: boolean;
+  duLieuThem?: Record<string, string>; captchaHopLe?: boolean; quocGia?: string;
 }): Promise<KetQuaDangKy> {
   const cd = await mot(`select * from chien_dich where slug=$1`, [tham.slug]);
   if (!cd || cd.trang_thai !== "chay") return { ok: false, loi: "Chiến dịch không tồn tại hoặc đã đóng." };
+
+  // Giới hạn khu vực (nhận diện qua header quốc gia của Cloudflare; không có header thì cho qua)
+  if (cd.khu_vuc && tham.quocGia) {
+    const choPhep = cd.khu_vuc.split(",").map((m: string) => m.trim().toUpperCase()).filter(Boolean);
+    if (choPhep.length && !choPhep.includes(tham.quocGia.toUpperCase()))
+      return { ok: false, loi: "Rất tiếc, chương trình chưa mở tại khu vực của bạn." };
+  }
 
   const email = tham.email.trim().toLowerCase();
   const ten = tham.ten.trim();

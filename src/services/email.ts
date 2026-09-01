@@ -56,6 +56,9 @@ export async function xepEmail(
 ) {
   let mau = MAU_MAC_DINH[loai];
   if (chienDichId) {
+    // Admin có thể tắt từng loại email theo chiến dịch (email_tat[loai] === false)
+    const cd = await mot(`select email_tat from chien_dich where id=$1`, [chienDichId]);
+    if (cd?.email_tat?.[loai] === false && loai !== "xac_minh") return;
     const ghiDe = await mot(`select tieu_de, noi_dung from mau_email where chien_dich_id=$1 and loai=$2`, [chienDichId, loai]);
     if (ghiDe) mau = { ...mau, ...ghiDe };
   }

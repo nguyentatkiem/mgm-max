@@ -26,3 +26,21 @@ body {
 .hieu {
   @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
 }
+/* Công tắc bật/tắt kiểu toggle (submit form khi bấm) */
+.cong-tac {
+  @apply relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer;
+}
+.cong-tac .num {
+  @apply inline-block h-5 w-5 translate-x-0.5 rounded-full bg-white shadow transition-transform;
+}
+.cong-tac.bat { @apply bg-blue-600; }
+.cong-tac.bat .num { @apply translate-x-[22px]; }
+.cong-tac.tat { @apply bg-slate-300; }
+/* Pill tab */
+.pill { @apply inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors cursor-pointer; }
+.pill-bat { @apply bg-blue-700 text-white; }
+.pill-tat { @apply bg-slate-100 text-slate-600 hover:bg-slate-200; }
+/* Hàng cài đặt kiểu [icon | tên+mô tả | điều khiển] */
+.hang-cai {
+  @apply flex items-center justify-between gap-4 rounded-2xl bg-white border border-slate-200 px-4 py-3.5;
+}

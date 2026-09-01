@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
     ip: (req.headers.get("x-forwarded-for") || "").split(",")[0].trim(),
     ua: req.headers.get("user-agent") || "",
     baseUrl, duLieuThem, captchaHopLe,
+    quocGia: req.headers.get("cf-ipcountry") || "",
   });
 
   const goc = nhung ? `/nhung/${slug}` : `/c/${slug}`;

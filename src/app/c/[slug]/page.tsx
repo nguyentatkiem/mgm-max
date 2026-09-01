@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Gift, Lock, ShieldQuestion, Sparkles, Users } from "lucide-react";
 import { mot, q } from "@/db";
+import ChenMa from "@/ui/ChenMa";
 import { layIp } from "@/services/http";
 import { soDangKyIpHomNay } from "@/services/nguoi-tham-gia";
 import { taoCaptcha, NGUONG_CAPTCHA } from "@/services/captcha";
@@ -31,10 +32,10 @@ function youtubeEmbed(url: string): string | null {
 
 export default async function TrangDangKy(props: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ ref?: string; loi?: string }>;
+  searchParams: Promise<{ ref?: string; loi?: string; src?: string }>;
 }) {
   const { slug } = await props.params;
-  const { ref = "", loi = "" } = await props.searchParams;
+  const { ref = "", loi = "", src = "" } = await props.searchParams;
   const cd = await mot(`select * from chien_dich where slug=$1`, [slug]);
   if (!cd) redirect("/");
 
@@ -71,9 +72,11 @@ export default async function TrangDangKy(props: {
   const captcha = canCaptcha ? taoCaptcha() : null;
 
   const mau = cd.mau_chinh || "#2563eb";
+  const nenDuoi = cd.mau_nen || "#f8fafc";
 
   return (
-    <main className="min-h-screen bg-slate-50" style={{ background: `linear-gradient(180deg, ${mau} 0%, ${mau}cc 38%, #f8fafc 62%)` }}>
+    <main className="min-h-screen bg-slate-50" style={{ background: `linear-gradient(180deg, ${mau} 0%, ${mau}cc 38%, ${nenDuoi} 62%)` }}>
+      {cd.ma_header_dang_ky && <ChenMa ma={cd.ma_header_dang_ky} />}
       <div className="mx-auto max-w-xl px-4 py-12">
         <div className="text-center text-white">
           {cd.logo_url ? (
@@ -83,7 +86,7 @@ export default async function TrangDangKy(props: {
           <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold backdrop-blur">
             <Sparkles className="h-4 w-4" /> Mời bạn — nhận quà
           </div>
-          <h1 className="mt-4 text-3xl font-black leading-tight sm:text-4xl">{cd.ten}</h1>
+          <h1 className="mt-4 text-3xl font-black leading-tight sm:text-4xl">{cd.tieu_de_trang || cd.ten}</h1>
           <p className="mt-3 text-white/85">{cd.mo_ta}</p>
           {cd.ket_thuc_luc && <div className="mt-4"><DemNguoc den={new Date(cd.ket_thuc_luc).toISOString()} /></div>}
           <div className="mt-3 inline-flex items-center gap-1.5 text-sm text-white/80">
@@ -107,6 +110,7 @@ export default async function TrangDangKy(props: {
             <input type="hidden" name="slug" value={cd.slug} />
             <input type="hidden" name="cd_id" value={cd.id} />
             <input type="hidden" name="ref" value={ref} />
+            <input type="hidden" name="kenh" value={src} />
             <div>
               <label className="nhan">Tên của bạn</label>
               <input name="ten" required maxLength={100} className="o-nhap" placeholder="Nguyễn Văn A" />
@@ -134,10 +138,12 @@ export default async function TrangDangKy(props: {
             )}
             <label className="flex items-start gap-2 text-xs text-slate-500">
               <input type="checkbox" required className="mt-0.5" />
-              Tôi đồng ý nhận email của chương trình và điều khoản sử dụng. Có thể huỷ đăng ký bất cứ lúc nào.
+              <span>
+                Tôi đồng ý nhận email của chương trình{cd.dieu_khoan ? <> và <a href="#dieu-khoan" className="font-semibold text-blue-700 underline">điều khoản</a></> : " và điều khoản sử dụng"}. Có thể huỷ đăng ký bất cứ lúc nào.
+              </span>
             </label>
             <button className="nut-chinh w-full text-base" style={{ backgroundColor: mau }}>
-              <Gift className="h-5 w-5" /> Đăng ký nhận quà ngay
+              <Gift className="h-5 w-5" /> {cd.nut_cta || "Đăng ký nhận quà ngay"}
             </button>
           </form>
         </div>
@@ -159,6 +165,13 @@ export default async function TrangDangKy(props: {
               </div>
             )}
           </div>
+        )}
+
+        {cd.dieu_khoan && (
+          <details id="dieu-khoan" className="the mt-6 p-5">
+            <summary className="cursor-pointer text-sm font-bold text-slate-700">{cd.dieu_khoan_tieu_de || "Thể lệ & điều khoản chương trình"}</summary>
+            <div className="mt-3 whitespace-pre-wrap text-sm text-slate-600">{cd.dieu_khoan}</div>
+          </details>
         )}
       </div>
     </main>

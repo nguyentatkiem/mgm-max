@@ -298,6 +298,171 @@ export async function actBroadcast(form: FormData) {
   redirect(`/admin/email?broadcast=${nguoi.length}`);
 }
 
+// ————— Giao diện mới: wizard, top bar, thiết lập từng mục —————
+export async function actDoiTenChienDich(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  const ten = String(form.get("ten") || "").trim();
+  if (ten) await q(`update chien_dich set ten=$2 where id=$1`, [id, ten.slice(0, 120)]);
+  revalidatePath(`/admin/cd/${id}`, "layout");
+}
+
+export async function actTaoTuMau(form: FormData) {
+  await canAdmin();
+  const loai = String(form.get("loai") || "tu_do");
+  const preset = JSON.parse(String(form.get("preset") || "{}"));
+  let slug = `chien-dich-${Date.now().toString(36).slice(-6)}`;
+  const cd = await mot(
+    `insert into chien_dich (slug, ten, mo_ta, loai_chien_dich, tieu_de_trang, nut_cta, mau_chinh, mau_nen, giai_boc_tham, hai_chieu)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`,
+    [slug, preset.ten_cd || "Chiến dịch mới", preset.moTa || "", loai,
+     preset.tieuDe || "", preset.nutCta || "", preset.mauChinh || "#2563eb", preset.mauNen || "",
+     preset.giaiBocTham || "", preset.haiChieu !== false]
+  );
+  slug = `cd-${cd!.id}`;
+  await q(`update chien_dich set slug=$2 where id=$1`, [cd!.id, slug]);
+  if (preset.taoMocMau) {
+    await q(
+      `insert into moc_qua (chien_dich_id, nguong, ten_qua, loai_qua) values
+       ($1,1,'[Quà mốc 1 — anh sửa lại]','coupon'), ($1,3,'[Quà mốc 3]','file'), ($1,5,'[Quà mốc 5]','link'), ($1,10,'[Quà mốc 10]','khac')`,
+      [cd!.id]
+    );
+  }
+  redirect(`/admin/cd/${cd!.id}/thiet-lap/trang-dang-ky`);
+}
+
+export async function actChayChienDich(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  const coMoc = await mot(`select 1 from moc_qua where chien_dich_id=$1 limit 1`, [id]);
+  const cd = await mot(`select giai_boc_tham from chien_dich where id=$1`, [id]);
+  if (coMoc || cd?.giai_boc_tham) {
+    await q(`update chien_dich set trang_thai='chay' where id=$1`, [id]);
+  }
+  revalidatePath(`/admin/cd/${id}`, "layout");
+}
+
+export async function actSuaEditor(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  await q(
+    `update chien_dich set tieu_de_trang=$2, mo_ta=$3, nut_cta=$4, mau_chinh=$5, mau_nen=$6, anh_cover=$7, logo_url=$8, video_url=$9 where id=$1`,
+    [id, String(form.get("tieu_de_trang") || ""), String(form.get("mo_ta") || ""), String(form.get("nut_cta") || ""),
+     String(form.get("mau_chinh") || "#2563eb"), String(form.get("mau_nen") || ""),
+     String(form.get("anh_cover") || ""), String(form.get("logo_url") || ""), String(form.get("video_url") || "")]
+  );
+  revalidatePath(`/admin/editor/${id}`);
+}
+
+export async function actSuaTrangDong(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  await q(`update chien_dich set redirect_khi_dong=$2, noi_dung_dong=$3 where id=$1`,
+    [id, String(form.get("redirect_khi_dong") || ""), String(form.get("noi_dung_dong") || "")]);
+  revalidatePath(`/admin/cd/${id}/thiet-lap/trang-dong`);
+}
+
+export async function actSuaDieuKhoan(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  await q(`update chien_dich set dieu_khoan_tieu_de=$2, dieu_khoan=$3 where id=$1`,
+    [id, String(form.get("tieu_de") || ""), String(form.get("noi_dung") || "")]);
+  revalidatePath(`/admin/cd/${id}/thiet-lap/cai-dat/dieu-khoan`);
+}
+
+export async function actSuaKhuVuc(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  const che = String(form.get("che_do")) === "gioi_han" ? String(form.get("khu_vuc") || "").toUpperCase().replace(/[^A-Z,\s]/g, "") : "";
+  await q(`update chien_dich set khu_vuc=$2 where id=$1`, [id, che]);
+  revalidatePath(`/admin/cd/${id}/thiet-lap/nang-cao/khu-vuc`);
+}
+
+export async function actSuaDiemSo(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  await q(
+    `update chien_dich set diem_dang_ky=$2, diem_moi_ban=$3, diem_share=$4, diem_click=$5, cap_click_ngay=$6 where id=$1`,
+    [id, Number(form.get("diem_dang_ky") || 10), Number(form.get("diem_moi_ban") || 100),
+     Number(form.get("diem_share") || 5), Number(form.get("diem_click") || 2), Number(form.get("cap_click_ngay") || 20)]
+  );
+  revalidatePath(`/admin/cd/${id}/thiet-lap/nang-cao/diem`);
+}
+
+export async function actTatBatEmail(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  const loai = String(form.get("loai"));
+  const cd = await mot(`select email_tat from chien_dich where id=$1`, [id]);
+  const map = cd?.email_tat || {};
+  map[loai] = map[loai] === false ? true : false; // toggle (mặc định đang bật)
+  await q(`update chien_dich set email_tat=$2 where id=$1`, [id, JSON.stringify(map)]);
+  revalidatePath(`/admin/cd/${id}/thiet-lap/cai-dat/email`);
+}
+
+export async function actSuaChung(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  await q(
+    `update chien_dich set cookie_ngay=$2, che_do_demo=$3, kenh_share=$4, ket_thuc_luc=$5, webhook_url=$6 where id=$1`,
+    [id, Number(form.get("cookie_ngay") || 30), form.get("che_do_demo") === "on",
+     String(form.get("kenh_share") || "zalo,facebook,messenger,telegram,copy"),
+     String(form.get("ket_thuc_luc") || "") || null, String(form.get("webhook_url") || "")]
+  );
+  revalidatePath(`/admin/cd/${id}/thiet-lap/nang-cao/chung`);
+}
+
+export async function actSuaGioiThieu(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  await q(
+    `update chien_dich set diem_moi_ban=$2, hai_chieu=$3, qua_chao_mung=$4, qua_chao_mung_gia_tri=$5 where id=$1`,
+    [id, Number(form.get("diem_moi_ban") || 100), form.get("hai_chieu") === "on",
+     String(form.get("qua_chao_mung") || ""), String(form.get("qua_chao_mung_gia_tri") || "")]
+  );
+  revalidatePath(`/admin/cd/${id}/thiet-lap/gioi-thieu`);
+}
+
+export async function actSuaGiaiDacBiet(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  await q(`update chien_dich set giai_boc_tham=$2, so_giai=$3, ket_thuc_luc=$4 where id=$1`,
+    [id, String(form.get("giai_boc_tham") || ""), Number(form.get("so_giai") || 3),
+     String(form.get("ket_thuc_luc") || "") || null]);
+  revalidatePath(`/admin/cd/${id}/thiet-lap/giai-dac-biet`);
+}
+
+export async function actThemNguon(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("chien_dich_id"));
+  const keyword = String(form.get("keyword") || "").toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 30);
+  if (keyword) {
+    await q(`insert into theo_doi_nguon (chien_dich_id, ten, keyword) values ($1,$2,$3) on conflict do nothing`,
+      [id, String(form.get("ten") || keyword), keyword]);
+  }
+  revalidatePath(`/admin/cd/${id}`, "layout");
+}
+
+export async function actXoaNguon(form: FormData) {
+  await canAdmin();
+  await q(`delete from theo_doi_nguon where id=$1`, [Number(form.get("id"))]);
+  revalidatePath(`/admin/cd/${Number(form.get("chien_dich_id"))}`, "layout");
+}
+
+export async function actSuaHeaderCodes(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  await q(`update chien_dich set ma_header_dang_ky=$2, ma_header_chia_se=$3 where id=$1`,
+    [id, String(form.get("ma_dang_ky") || ""), String(form.get("ma_chia_se") || "")]);
+  revalidatePath(`/admin/cd/${id}/thiet-lap/nang-cao/utm`);
+}
+
+export async function actXoaChienDich(form: FormData) {
+  await canAdmin();
+  await q(`delete from chien_dich where id=$1`, [Number(form.get("id"))]);
+  redirect("/admin");
+}
+
 // ————— F51 — Referral AI: sinh trọn chiến dịch bằng Claude —————
 export async function actTaoBangAI(form: FormData) {
   await canAdmin();

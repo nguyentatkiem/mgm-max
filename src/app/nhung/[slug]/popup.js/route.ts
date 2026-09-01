@@ -3,8 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 // F3 — script popup: dán 1 thẻ <script> vào website là có nút nổi mở form đăng ký
 export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const { slug } = await ctx.params;
+  // Bảo mật (C3): slug chỉ gồm [a-z0-9-] — chặn chèn mã (XSS) vào JS phục vụ
+  if (!/^[a-z0-9-]{1,80}$/.test(slug)) {
+    return new NextResponse("/* slug không hợp lệ */", { status: 400, headers: { "Content-Type": "application/javascript; charset=utf-8" } });
+  }
   const proto = req.headers.get("x-forwarded-proto") || "http";
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "localhost:3005";
+  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "localhost:3005").replace(/[^a-zA-Z0-9.:-]/g, "");
   const src = `${proto}://${host}/nhung/${slug}`;
 
   const js = `(function(){

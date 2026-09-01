@@ -1,6 +1,7 @@
 import { Code2, Mail, Share2, Upload } from "lucide-react";
 import { mot } from "@/db";
 import { layBaseUrl } from "@/services/http";
+import { tokenNhanh } from "@/services/ky";
 import { actImportCsv } from "../../../../actions";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,8 @@ export default async function TrafficSanCo(props: {
           </summary>
           <div className="mt-4 border-t border-slate-100 pt-4">
             <p className="text-sm text-slate-500">Dán link này vào email gửi từ hệ thống của anh, thay {"{{EMAIL}}/{{TEN}}"} bằng merge tag của nền tảng email:</p>
-            <pre className="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-emerald-300">{`${baseUrl}/nhanh/${cd.slug}?email={{EMAIL}}&ten={{TEN}}`}</pre>
+            <pre className="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-emerald-300">{`${baseUrl}/nhanh/${cd.slug}?k=${tokenNhanh(cd.id)}&email={{EMAIL}}&ten={{TEN}}`}</pre>
+            <p className="mt-1 text-xs text-amber-600">⚠️ Link chứa token bí mật của chiến dịch — chỉ dán vào hệ thống email của anh, đừng đăng công khai.</p>
           </div>
         </details>
 

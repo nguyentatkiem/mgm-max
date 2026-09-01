@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { mot } from "@/db";
 import { dangKy } from "@/services/nguoi-tham-gia";
 import { kiemTraCaptcha } from "@/services/captcha";
+import { baseUrlTinCay } from "@/services/http";
+import { layCaiDat } from "@/services/cai-dat";
 
 export async function POST(req: NextRequest) {
   const form = await req.formData();
   const slug = String(form.get("slug") || "");
   const nhung = String(form.get("nhung") || "");
-  const proto = req.headers.get("x-forwarded-proto") || "http";
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "localhost:3005";
-  const baseUrl = `${proto}://${host}`;
+  // Link trong email dùng base_url TIN CẬY (env/admin), KHÔNG lấy từ header (C4);
+  // redirect thì dùng req.url (host thật của chính request) là an toàn.
+  const baseUrl = await baseUrlTinCay(layCaiDat);
 
   // Nguồn mã người mời: ô nhập tay > cookie > query ref
   const maForm = String(form.get("ma_gioi_thieu") || "");
@@ -44,13 +46,13 @@ export async function POST(req: NextRequest) {
   });
 
   const goc = nhung ? `/nhung/${slug}` : `/c/${slug}`;
-  if (!kq.ok) return NextResponse.redirect(new URL(`${goc}?loi=${encodeURIComponent(kq.loi)}`, baseUrl), 303);
+  if (!kq.ok) return NextResponse.redirect(new URL(`${goc}?loi=${encodeURIComponent(kq.loi)}`, req.url), 303);
   if (kq.daXacMinh) {
-    const res = NextResponse.redirect(new URL(`/toi/${kq.ma}`, baseUrl), 303);
+    const res = NextResponse.redirect(new URL(`/toi/${kq.ma}`, req.url), 303);
     res.cookies.set(`mgm_toi_${kq.cdId}`, kq.ma, { maxAge: 180 * 24 * 3600, path: "/", sameSite: "lax" });
     return res;
   }
   const demoQ = kq.demo ? `&t=${kq.token}` : "";
   const nhungQ = nhung ? "&nhung=1" : "";
-  return NextResponse.redirect(new URL(`/c/${slug}/cam-on?ma=${kq.ma}${demoQ}${nhungQ}`, baseUrl), 303);
+  return NextResponse.redirect(new URL(`/c/${slug}/cam-on?ma=${kq.ma}${demoQ}${nhungQ}`, req.url), 303);
 }

@@ -120,13 +120,17 @@ export async function actNapCoupon(form: FormData) {
 export async function actThemHanhDong(form: FormData) {
   await canAdmin();
   const cdId = Number(form.get("chien_dich_id"));
+  const ten = String(form.get("ten") || "").trim();
+  const dapAn = String(form.get("dap_an") || "").trim();
+  // Chặn (C7): nhiệm vụ bắt buộc có tên + đáp án, nếu không sẽ thành "đáp án rỗng = điểm miễn phí"
+  if (!ten || !dapAn) { revalidatePath(`/admin/cd/${cdId}/thiet-lap/cai-dat/nhiem-vu`); return; }
   await q(
     `insert into hanh_dong_tuy_chinh (chien_dich_id, ten, mo_ta, url, diem, cau_hoi, dap_an)
      values ($1,$2,$3,$4,$5,$6,$7)`,
-    [cdId, String(form.get("ten")), String(form.get("mo_ta") || ""), String(form.get("url") || ""),
-     Number(form.get("diem") || 10), String(form.get("cau_hoi") || ""), String(form.get("dap_an") || "")]
+    [cdId, ten, String(form.get("mo_ta") || ""), String(form.get("url") || ""),
+     Number(form.get("diem") || 10), String(form.get("cau_hoi") || ""), dapAn]
   );
-  revalidatePath(`/admin/chien-dich/${cdId}`);
+  revalidatePath(`/admin/cd/${cdId}/thiet-lap/cai-dat/nhiem-vu`);
 }
 
 export async function actBatTatHanhDong(form: FormData) {
@@ -224,6 +228,8 @@ export async function actLuuCaiDat(form: FormData) {
   await ghiCaiDat("whitelist_ip", String(form.get("whitelist_ip") || ""));
   await ghiCaiDat("blacklist_email", String(form.get("blacklist_email") || ""));
   await ghiCaiDat("blacklist_ip", String(form.get("blacklist_ip") || ""));
+  // URL công khai TIN CẬY để nhúng vào email (chỉ admin đặt; không lấy từ header người dùng — C4)
+  await ghiCaiDat("base_url", String(form.get("base_url") || "").trim().replace(/\/$/, ""));
   revalidatePath("/admin/cai-dat");
 }
 

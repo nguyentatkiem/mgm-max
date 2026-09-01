@@ -19,7 +19,19 @@
 - 🔴 C7 nhiệm vụ đáp án rỗng → `dung:true`, +50 điểm miễn phí. LỖ HỔNG THẬT.
 - ✅ C5 admin auth CHẶT: `/admin` chưa login → 307 về đăng nhập; `/api/admin/csv` → 401.
 
-→ 6 lỗ hổng 🔴 (mục 1–7 dưới) **đã kiểm chứng bằng khai thác thật**, không còn là nghi ngờ. Cần vá trước khi mở cho người dùng thật. Dữ liệu test đã dọn sạch, campaign demo nguyên vẹn.
+→ 6 lỗ hổng 🔴 (mục 1–7 dưới) **đã kiểm chứng bằng khai thác thật**, không còn là nghi ngờ. Dữ liệu test đã dọn sạch, campaign demo nguyên vẹn.
+
+## 🛡️ ĐÃ VÁ TOÀN BỘ 6 LỖ HỔNG 🔴 (01/09/2026, xác nhận bằng tấn công lại)
+
+- **C1 `/nhanh`** → bắt buộc **token campaign** (HMAC, chỉ admin phát trong link one-click) + giới hạn IP/ngày. *Kiểm: gọi không token tạo 0 bot; token đúng vẫn hoạt động.* Đồng thời sửa `dangKyNhanh` trao đủ điểm đăng ký + quà chào mừng + công nhận referral (finding #9).
+- **C2 `/api/cron`** → bắt buộc `CRON_SECRET` (query `?key=` hoặc `Authorization: Bearer`). *Kiểm: không/sai key → 401, đúng key → 200.* Cron nội bộ (instrumentation) gọi thẳng hàm nên không ảnh hưởng.
+- **C3 `popup.js`** → validate `slug` `^[a-z0-9-]+$` + lọc host. *Kiểm: payload `alert(document.domain)` không còn lọt.*
+- **C4 base_url poisoning** → link trong email dùng `baseUrlTinCay` (env `APP_BASE_URL` → base_url admin đặt trong Cài đặt → localhost), **không bao giờ lấy từ header**; bỏ mọi `ghiCaiDat("base_url")` từ luồng người dùng. *Kiểm: header `evil-phishing.com` không còn vào link email.*
+- **C6 cộng điểm khi campaign đóng** → `chia-se` / `hanh-dong` / `r/[ma]` đều chặn khi `trang_thai≠'chay'` (và người bị chặn / chưa xác minh). *Kiểm: campaign tạm dừng → `congDiem:false`.*
+- **C7 nhiệm vụ đáp án rỗng** → chặn cả khi tạo (`actThemHanhDong` bắt buộc đáp án) lẫn khi chấm (đáp án rỗng luôn `dung:false`). *Kiểm: `{dung:false, loi:"Nhiệm vụ chưa cấu hình đáp án."}`.*
+- Bonus: `req.json()`/`JSON.parse` bọc try/catch (body rác → 200 thay vì 500); quà chào mừng idempotent (chống nhân đôi khi verify 2 lần).
+
+Cần khi deploy thật: đặt `CRON_SECRET`, `APP_BASE_URL` (hoặc điền URL công khai trong Cài đặt hệ thống).
 
 ---
 

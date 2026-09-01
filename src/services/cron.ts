@@ -1,12 +1,14 @@
 // F27 + F38 — việc chạy nền định kỳ: tự chốt campaign hết hạn, nhắc người im ắng, xử lý email.
 import { mot, q } from "@/db";
 import { layCaiDat } from "./cai-dat";
+import { baseUrlTinCay } from "./http";
 import { chayBocTham } from "./boc-tham-svc";
 import { xepEmail, xuLyHangDoi } from "./email";
 import { bangXepHang } from "./thong-ke";
 
 export async function chayCron(): Promise<string> {
-  const base = (await layCaiDat("base_url")) || "http://localhost:3005";
+  // base_url TIN CẬY: env APP_BASE_URL → cài đặt admin → localhost (không tin header người dùng, C4)
+  const base = await baseUrlTinCay(layCaiDat);
   const bao: string[] = [];
 
   // 1. Campaign quá hạn: tự bốc thăm (chờ admin duyệt) + tự đóng

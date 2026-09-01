@@ -11,6 +11,8 @@ export default async function TrangCaiDat() {
   const whitelistIp = await layCaiDat("whitelist_ip");
   const blacklistEmail = await layCaiDat("blacklist_email");
   const blacklistIp = await layCaiDat("blacklist_ip");
+  const baseUrlAdmin = await layCaiDat("base_url");
+  const coEnvBase = !!process.env.APP_BASE_URL;
   const coResend = !!process.env.RESEND_API_KEY;
   const che = cheDoAI();
 
@@ -18,6 +20,12 @@ export default async function TrangCaiDat() {
     <div className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-black text-slate-900">Cài đặt hệ thống</h1>
       <form action={actLuuCaiDat} className="the mt-5 space-y-5 p-6">
+        <div>
+          <label className="nhan">URL công khai (dùng cho link trong email — nguồn tin cậy, không lấy từ header)</label>
+          <input name="base_url" defaultValue={baseUrlAdmin} disabled={coEnvBase} className="o-nhap font-mono text-sm"
+            placeholder="https://ten-mien-cua-anh.vn" />
+          <p className="mt-1 text-xs text-slate-400">{coEnvBase ? "Đang lấy từ biến môi trường APP_BASE_URL (ưu tiên cao nhất)." : "Đặt đúng domain thật để link xác minh/mời trong email không bị sai. Trống = dùng http://localhost:3005."}</p>
+        </div>
         <div>
           <label className="nhan">Whitelist IP (mỗi IP một dòng)</label>
           <textarea name="whitelist_ip" rows={3} defaultValue={whitelistIp} className="o-nhap font-mono text-sm" placeholder="IP của đội vận hành — để tự test không dính giới hạn 3 đăng ký/IP/ngày" />

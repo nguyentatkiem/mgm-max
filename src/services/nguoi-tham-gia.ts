@@ -4,7 +4,7 @@ import { chamDiemRuiRo, emailHangLoat, emailRac, NGUONG_CACH_LY } from "@/core/g
 import { mocMoKhoa, mocKeTiep, sapChamMoc, type Moc } from "@/core/moc";
 import { ghiDiem } from "./diem";
 import { xepEmail } from "./email";
-import { ghiCaiDat, layCaiDat } from "./cai-dat";
+import { layCaiDat } from "./cai-dat";
 import { NGUONG_CAPTCHA } from "./captcha";
 import { banWebhook } from "./webhook";
 
@@ -103,9 +103,6 @@ export async function dangKy(tham: {
     }
   }
 
-  // Nhớ base URL công khai để cron dựng link đúng host (kể cả sau tunnel)
-  ghiCaiDat("base_url", tham.baseUrl).catch(() => {});
-
   await xepEmail(cd.id, "xac_minh", email, ten, {
     ten, ten_chien_dich: cd.ten, link_xac_minh: `${tham.baseUrl}/xac-minh/${token}`,
   });
@@ -125,7 +122,17 @@ export async function dangKyNhanh(tham: {
 
   const cu = await mot(`select * from nguoi_tham_gia where chien_dich_id=$1 and email=$2`, [cd.id, email]);
   if (cu) {
-    if (!cu.xac_minh) await q(`update nguoi_tham_gia set xac_minh=true, xac_minh_luc=now() where id=$1`, [cu.id]);
+    // Người đã đăng ký nhưng chưa xác minh → hoàn tất như luồng xác minh thường
+    // (trao điểm đăng ký + công nhận referral chờ + quà chào mừng — trước đây bị bỏ sót, finding #9)
+    if (!cu.xac_minh) {
+      await q(`update nguoi_tham_gia set xac_minh=true, xac_minh_luc=now() where id=$1`, [cu.id]);
+      await ghiDiem(cd.id, cu.id, "dang_ky", "", cd.diem_dang_ky);
+      const dongQua = await traoChaoMung(cd, cu.id, !!cu.nguoi_moi_id);
+      const gt = await mot(`select id from gioi_thieu where nguoi_duoc_moi_id=$1 and trang_thai='cho'`, [cu.id]);
+      if (gt) await xacNhanGioiThieu(gt.id, tham.baseUrl, tham.guiEmail !== false);
+      if (tham.guiEmail !== false)
+        await xepEmail(cd.id, "chao_mung", email, cu.ten, { ten: cu.ten, ten_chien_dich: cd.ten, link_rieng: `${tham.baseUrl}/toi/${cu.ma}`, qua_chao_mung: dongQua });
+    }
     return { ok: true, ma: cu.ma, cdId: cd.id, moiTao: false };
   }
 
@@ -152,6 +159,7 @@ export async function dangKyNhanh(tham: {
     }
   }
   await ghiDiem(cd.id, nguoiId, "dang_ky", "", cd.diem_dang_ky);
+  const dongQua = await traoChaoMung(cd, nguoiId, !!nguoiMoi); // quà chào mừng hai chiều (finding #9)
   if (nguoiMoi) {
     const gt = await mot(
       `insert into gioi_thieu (chien_dich_id, nguoi_moi_id, nguoi_duoc_moi_id) values ($1,$2,$3)
@@ -162,10 +170,24 @@ export async function dangKyNhanh(tham: {
   }
   if (tham.guiEmail !== false) {
     await xepEmail(cd.id, "chao_mung", email, ten, {
-      ten, ten_chien_dich: cd.ten, link_rieng: `${tham.baseUrl}/toi/${ma}`, qua_chao_mung: "",
+      ten, ten_chien_dich: cd.ten, link_rieng: `${tham.baseUrl}/toi/${ma}`, qua_chao_mung: dongQua,
     });
   }
   return { ok: true, ma, cdId: cd.id, moiTao: true };
+}
+
+/** Trao quà chào mừng hai chiều cho người được mời — idempotent (không nhân đôi khi gọi 2 lần).
+ *  Trả về dòng mô tả quà để chèn vào email (rỗng nếu không có quà). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function traoChaoMung(cd: any, nguoiId: number, coNguoiMoi: boolean): Promise<string> {
+  if (!(cd.hai_chieu && cd.qua_chao_mung && coNguoiMoi)) return "";
+  await q(
+    `insert into qua_da_trao (nguoi_id, loai, ten_qua, loai_qua, gia_tri)
+     select $1,'chao_mung',$2,'coupon',$3
+     where not exists (select 1 from qua_da_trao where nguoi_id=$1 and loai='chao_mung')`,
+    [nguoiId, cd.qua_chao_mung, cd.qua_chao_mung_gia_tri]
+  );
+  return `Quà chào mừng của bạn: ${cd.qua_chao_mung}${cd.qua_chao_mung_gia_tri ? ` — ${cd.qua_chao_mung_gia_tri}` : ""}\n\n`;
 }
 
 /** Xác minh email → kích hoạt điểm + xử referral + quà hai chiều. */
@@ -177,19 +199,10 @@ export async function xacMinh(token: string, baseUrl: string): Promise<{ ma: str
   const cd = await mot(`select * from chien_dich where id=$1`, [ng.chien_dich_id]);
   await q(`update nguoi_tham_gia set xac_minh=true, xac_minh_luc=now() where id=$1`, [ng.id]);
   await ghiDiem(cd.id, ng.id, "dang_ky", "", cd.diem_dang_ky);
-  ghiCaiDat("base_url", baseUrl).catch(() => {});
   banWebhook(cd.webhook_url, "lead.xac_minh", { email: ng.email, ten: ng.ten, ma: ng.ma, chien_dich: cd.slug });
 
   const linkRieng = `${baseUrl}/toi/${ng.ma}`;
-  let dongQua = "";
-  // Thưởng hai chiều: người được mời cũng có quà chào mừng
-  if (cd.hai_chieu && cd.qua_chao_mung && ng.nguoi_moi_id) {
-    await q(
-      `insert into qua_da_trao (nguoi_id, loai, ten_qua, loai_qua, gia_tri) values ($1,'chao_mung',$2,'coupon',$3)`,
-      [ng.id, cd.qua_chao_mung, cd.qua_chao_mung_gia_tri]
-    );
-    dongQua = `Quà chào mừng của bạn: ${cd.qua_chao_mung}${cd.qua_chao_mung_gia_tri ? ` — ${cd.qua_chao_mung_gia_tri}` : ""}\n\n`;
-  }
+  const dongQua = await traoChaoMung(cd, ng.id, !!ng.nguoi_moi_id); // hai chiều, idempotent
   await xepEmail(cd.id, "chao_mung", ng.email, ng.ten, {
     ten: ng.ten, ten_chien_dich: cd.ten, link_rieng: linkRieng, qua_chao_mung: dongQua,
   });

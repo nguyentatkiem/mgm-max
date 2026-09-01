@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { mot } from "@/db";
 import { dangKy } from "@/services/nguoi-tham-gia";
 import { kiemTraCaptcha } from "@/services/captcha";
-import { baseUrlTinCay } from "@/services/http";
+import { baseUrlTinCay, chuyenHuong } from "@/services/http";
 import { layCaiDat } from "@/services/cai-dat";
 
 export async function POST(req: NextRequest) {
@@ -46,13 +46,13 @@ export async function POST(req: NextRequest) {
   });
 
   const goc = nhung ? `/nhung/${slug}` : `/c/${slug}`;
-  if (!kq.ok) return NextResponse.redirect(new URL(`${goc}?loi=${encodeURIComponent(kq.loi)}`, req.url), 303);
+  if (!kq.ok) return chuyenHuong(`${goc}?loi=${encodeURIComponent(kq.loi)}`, 303);
   if (kq.daXacMinh) {
-    const res = NextResponse.redirect(new URL(`/toi/${kq.ma}`, req.url), 303);
+    const res = chuyenHuong(`/toi/${kq.ma}`, 303);
     res.cookies.set(`mgm_toi_${kq.cdId}`, kq.ma, { maxAge: 180 * 24 * 3600, path: "/", sameSite: "lax" });
     return res;
   }
   const demoQ = kq.demo ? `&t=${kq.token}` : "";
   const nhungQ = nhung ? "&nhung=1" : "";
-  return NextResponse.redirect(new URL(`/c/${slug}/cam-on?ma=${kq.ma}${demoQ}${nhungQ}`, req.url), 303);
+  return chuyenHuong(`/c/${slug}/cam-on?ma=${kq.ma}${demoQ}${nhungQ}`, 303);
 }

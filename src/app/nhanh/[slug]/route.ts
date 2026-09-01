@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { mot } from "@/db";
 import { dangKyNhanh, soDangKyIpHomNay } from "@/services/nguoi-tham-gia";
 import { tokenNhanh } from "@/services/ky";
-import { baseUrlTinCay } from "@/services/http";
+import { baseUrlTinCay, chuyenHuong } from "@/services/http";
 import { layCaiDat } from "@/services/cai-dat";
 
 // F14 — one-click link cho list email CÓ SẴN (do ADMIN phát, có token campaign):
@@ -17,23 +17,23 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
   const baseUrl = await baseUrlTinCay(layCaiDat); // link email tin cậy (C4)
 
   const cd = await mot(`select id, slug from chien_dich where slug=$1`, [slug]);
-  if (!cd) return NextResponse.redirect(new URL("/", req.url));
+  if (!cd) return chuyenHuong("/");
 
   // Token campaign phải khớp — nếu sai/thiếu, đưa về trang đăng ký thường (qua double opt-in + chống gian lận)
   if (k !== tokenNhanh(cd.id)) {
-    return NextResponse.redirect(new URL(`/c/${cd.slug}${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`, req.url));
+    return chuyenHuong(`/c/${cd.slug}${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`);
   }
 
   // Giới hạn IP/ngày (chống spam ngay cả khi link lộ)
   const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim();
   if (ip && (await soDangKyIpHomNay(cd.id, ip)) >= 20) {
-    return NextResponse.redirect(new URL(`/c/${cd.slug}?loi=${encodeURIComponent("Quá nhiều lượt từ mạng của bạn hôm nay.")}`, req.url));
+    return chuyenHuong(`/c/${cd.slug}?loi=${encodeURIComponent("Quá nhiều lượt từ mạng của bạn hôm nay.")}`);
   }
 
   const kq = await dangKyNhanh({ slug, ten, email, maNguoiMoi: ref, kenh: "one-click", baseUrl });
-  if (!kq.ok) return NextResponse.redirect(new URL(`/c/${slug}?loi=${encodeURIComponent(kq.loi)}`, req.url));
+  if (!kq.ok) return chuyenHuong(`/c/${slug}?loi=${encodeURIComponent(kq.loi)}`);
 
-  const res = NextResponse.redirect(new URL(`/toi/${kq.ma}${kq.moiTao ? "?moi=1" : ""}`, req.url));
+  const res = chuyenHuong(`/toi/${kq.ma}${kq.moiTao ? "?moi=1" : ""}`);
   res.cookies.set(`mgm_toi_${kq.cdId}`, kq.ma, { maxAge: 180 * 24 * 3600, path: "/", sameSite: "lax" });
   return res;
 }

@@ -1,4 +1,12 @@
 import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+
+/** Redirect TƯƠNG ĐỐI: Location là đường dẫn, trình duyệt tự resolve theo origin thật của
+ *  request. Nhờ vậy chạy đúng sau mọi proxy/tunnel (cloudflared ghi Host=localhost) — không
+ *  đá người dùng về localhost, và không tin Host header (tránh open-redirect/poisoning). */
+export function chuyenHuong(path: string, status: 302 | 303 | 307 = 307): NextResponse {
+  return new NextResponse(null, { status, headers: { Location: path } });
+}
 
 /** URL gốc: ưu tiên biến môi trường tin cậy APP_BASE_URL; nếu không có mới dựng từ header
  *  (chỉ dùng cho hiển thị/link trong chính request đó — KHÔNG lưu toàn cục, tránh header poisoning). */

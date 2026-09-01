@@ -68,7 +68,19 @@ export default async function NguoiThamGia(props: {
         ))}
       </div>
 
-      <div className="the mt-4 p-4">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[230px_1fr]">
+        {/* Sidebar trái (như ảnh gốc: Tổng / Trực tiếp / Giới thiệu / Gian lận) */}
+        <aside className="the h-fit p-2">
+          {STAT.map((s) => (
+            <Link key={s.ma} href={link(s.ma)}
+              className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-colors ${tab === s.ma ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50"}`}>
+              <s.icon className="h-4.5 w-4.5" /> {s.ten}
+              {s.ma === "gian-lan" && s.so > 0 && <span className="ml-auto hieu bg-red-100 text-red-700">{s.so}</span>}
+            </Link>
+          ))}
+        </aside>
+
+        <div className="the min-w-0 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <div className="font-bold text-slate-800">{tongDong} {tab === "gian-lan" ? "referral chờ duyệt" : "người"}</div>
           {tab !== "gian-lan" && (
@@ -154,6 +166,7 @@ export default async function NguoiThamGia(props: {
             </div>
           </>
         )}
+        </div>
       </div>
     </div>
   );

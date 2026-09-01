@@ -26,12 +26,13 @@ export function cheDoAI(): CheDoAI {
   return process.env.ANTHROPIC_API_KEY ? "api" : "cli";
 }
 
-/** Bóc JSON từ output text (CLI có thể kèm chữ hoặc ```json fence). */
+/** Bóc JSON từ output text (bỏ fence markdown, lấy khối {..}, dọn dấu phẩy thừa). */
 function bocJson(text: string): string {
-  const t = text.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+  let t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
   const dau = t.indexOf("{");
   const cuoi = t.lastIndexOf("}");
-  return dau >= 0 && cuoi > dau ? t.slice(dau, cuoi + 1) : t;
+  if (dau >= 0 && cuoi > dau) t = t.slice(dau, cuoi + 1);
+  return t.replace(/,(\s*[}\]])/g, "$1"); // bỏ dấu phẩy thừa trước } hoặc ]
 }
 
 const HUONG_DAN = `Bạn là chuyên gia growth marketing Việt Nam, thiết kế chiến dịch viral member-get-member (mời bạn nhận quà, KHÔNG trả hoa hồng tiền mặt).
@@ -48,7 +49,11 @@ Hãy thiết kế trọn chiến dịch và in ra DUY NHẤT một JSON hợp l�
   "hanh_dong": [ {"ten": "...", "mo_ta": "...", "diem": 10, "url": "https://...", "cau_hoi": "câu hỏi xác minh", "dap_an": "đáp án ngắn"}, ... 2 nhiệm vụ ],
   "loi_moi": { "zalo": "...", "facebook": "...", "messenger": "...", "telegram": "...", "copy": "..." }
 }
-Lời mời soạn theo giọng tự nhiên như bạn bè nhắn nhau, mỗi kênh một kiểu. Toàn bộ tiếng Việt.`;
+Lời mời soạn theo giọng tự nhiên như bạn bè nhắn nhau, mỗi kênh một kiểu. Toàn bộ tiếng Việt.
+
+QUY TẮC ĐỊNH DẠNG BẮT BUỘC (để JSON luôn hợp lệ):
+- Chỉ in JSON thuần, không có chữ nào trước/sau, không bọc trong khối mã markdown.
+- Trong MỌI giá trị chuỗi: KHÔNG dùng dấu ngoặc kép. Nếu cần nhấn mạnh hay trích tên, dùng « ». KHÔNG xuống dòng giữa chuỗi. KHÔNG có dấu phẩy thừa trước } hoặc ].`;
 
 function dungPrompt(input: { thuongHieu: string; website: string; sanPham: string; doiTuong: string; ganeQua: string }): string {
   return `${HUONG_DAN}
@@ -103,17 +108,30 @@ export async function taoChienDichBangAI(input: {
 }): Promise<{ ok: true; spec: SpecChienDich } | { ok: false; loi: string }> {
   const prompt = dungPrompt(input);
   const che = cheDoAI();
-  try {
-    const text = che === "api" ? await goiApi(prompt) : await goiCli(prompt);
-    if (!text.trim()) return { ok: false, loi: "AI trả kết quả rỗng — thử lại." };
-    return { ok: true, spec: JSON.parse(bocJson(text)) as SpecChienDich };
-  } catch (e) {
-    const loi = String(e);
-    if (loi.includes("ENOENT"))
-      return { ok: false, loi: "Chưa cài Claude CLI trên máy chủ. Cài `claude` và đăng nhập gói subscription (lệnh: claude, rồi /login), hoặc điền ANTHROPIC_API_KEY vào .env." };
-    if (loi.includes("authentication") || loi.includes("401") || loi.includes("Invalid API key") || loi.includes("Could not resolve"))
-      return { ok: false, loi: "AI chưa xác thực. Với gói sub: chạy `claude` rồi /login trên máy chủ. Với API: điền ANTHROPIC_API_KEY vào .env." };
-    if (loi.includes("JSON")) return { ok: false, loi: "AI trả về không đúng định dạng — bấm tạo lại giúp em." };
-    return { ok: false, loi: loi.slice(0, 300) };
+  let loiCuoi = "";
+  // Model đôi khi in JSON lỗi (ngoặc kép lồng) — thử lại tối đa 3 lần, mỗi lần sinh độc lập.
+  for (let lan = 1; lan <= 3; lan++) {
+    try {
+      const text = che === "api" ? await goiApi(prompt) : await goiCli(prompt);
+      if (!text.trim()) { loiCuoi = "AI trả kết quả rỗng"; continue; }
+      try {
+        const spec = JSON.parse(bocJson(text)) as SpecChienDich;
+        if (!spec.ten || !Array.isArray(spec.moc_qua)) { loiCuoi = "thiếu trường bắt buộc"; continue; }
+        return { ok: true, spec };
+      } catch (pe) {
+        loiCuoi = "JSON lỗi";
+        console.error(`[AI] parse fail lần ${lan}:`, String(pe), "| raw 300:", text.slice(0, 300));
+        continue; // sinh lại
+      }
+    } catch (e) {
+      const loi = String(e);
+      // Lỗi hạ tầng (không phải lỗi định dạng) → dừng ngay, báo rõ
+      if (loi.includes("ENOENT"))
+        return { ok: false, loi: "Chưa cài Claude CLI trên máy chủ. Cài `claude` rồi chạy `claude` + /login bằng gói subscription, hoặc điền ANTHROPIC_API_KEY vào .env." };
+      if (loi.includes("authentication") || loi.includes("401") || loi.includes("Invalid API key") || loi.includes("Could not resolve") || loi.toLowerCase().includes("login"))
+        return { ok: false, loi: "AI chưa xác thực. Với gói sub: chạy `claude` rồi /login trên máy chủ. Với API: điền ANTHROPIC_API_KEY vào .env." };
+      loiCuoi = loi.slice(0, 200);
+    }
   }
+  return { ok: false, loi: `AI chưa tạo được sau 3 lần (${loiCuoi}) — bấm tạo lại giúp em, hoặc mô tả sản phẩm/quà rõ hơn.` };
 }

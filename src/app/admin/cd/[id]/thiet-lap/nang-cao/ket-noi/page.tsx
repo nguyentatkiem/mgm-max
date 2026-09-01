@@ -1,5 +1,6 @@
 import { Plug, Save, Webhook } from "lucide-react";
 import { mot } from "@/db";
+import { cheDoAI } from "@/services/ai";
 import { actSuaGiaoDien } from "../../../../../actions";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,7 @@ export default async function KetNoi(props: { params: Promise<{ id: string }> })
   const { id } = await props.params;
   const cd = await mot(`select * from chien_dich where id=$1`, [Number(id)]);
   const coResend = !!process.env.RESEND_API_KEY;
-  const coAI = !!process.env.ANTHROPIC_API_KEY;
+  const che = cheDoAI();
 
   return (
     <div>
@@ -31,10 +32,10 @@ export default async function KetNoi(props: { params: Promise<{ id: string }> })
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600"><Plug className="h-5 w-5" /></span>
             <div>
               <div className="font-bold text-slate-800">Referral AI — Claude</div>
-              <div className="text-xs text-slate-400">Biến môi trường ANTHROPIC_API_KEY</div>
+              <div className="text-xs text-slate-400">{che === "cli" ? "Claude CLI — gói subscription (đăng nhập trên máy chủ)" : "Claude API — ANTHROPIC_API_KEY"}</div>
             </div>
           </div>
-          <span className={`hieu ${coAI ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{coAI ? "Đã có key" : "Chưa có key"}</span>
+          <span className={`hieu ${che === "cli" ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>{che === "cli" ? "Gói sub (CLI)" : "API key"}</span>
         </div>
       </div>
 

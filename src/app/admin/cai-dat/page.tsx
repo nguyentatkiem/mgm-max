@@ -1,5 +1,6 @@
 import { Save, ShieldCheck } from "lucide-react";
 import { layCaiDat } from "@/services/cai-dat";
+import { cheDoAI } from "@/services/ai";
 import { yeuCauAdmin } from "../bao-ve";
 import { actLuuCaiDat } from "../actions";
 
@@ -11,7 +12,7 @@ export default async function TrangCaiDat() {
   const blacklistEmail = await layCaiDat("blacklist_email");
   const blacklistIp = await layCaiDat("blacklist_ip");
   const coResend = !!process.env.RESEND_API_KEY;
-  const coAI = !!process.env.ANTHROPIC_API_KEY;
+  const che = cheDoAI();
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -36,7 +37,7 @@ export default async function TrangCaiDat() {
         <h2 className="flex items-center gap-2 font-bold text-slate-900"><ShieldCheck className="h-5 w-5 text-blue-600" /> Trạng thái hệ thống</h2>
         <ul className="mt-3 space-y-2">
           <li>• Gửi email: {coResend ? <b className="text-emerald-600">Resend (thật)</b> : <b className="text-blue-700">Giả lập</b>} — cấu hình qua biến môi trường <code className="font-mono">RESEND_API_KEY</code></li>
-          <li>• Referral AI: {coAI ? <b className="text-emerald-600">Đã có key</b> : <b className="text-amber-600">Chưa có key</b>} — biến <code className="font-mono">ANTHROPIC_API_KEY</code></li>
+          <li>• Referral AI: {che === "cli" ? <b className="text-emerald-600">Claude CLI (gói subscription)</b> : <b className="text-blue-700">Claude API (ANTHROPIC_API_KEY)</b>} — CLI: chạy <code className="font-mono">claude</code> + <code className="font-mono">/login</code> trên máy chủ; hoặc ép chế độ bằng <code className="font-mono">MGM_AI_MODE=cli|api</code></li>
           <li>• Cron nội bộ chạy 5 phút/lần: tự đóng campaign hết hạn + tự bốc thăm (chờ duyệt), nhắc người im ắng 3 ngày, xử lý email — gọi tay: <code className="font-mono">GET /api/cron</code></li>
           <li>• Chống gian lận đang bật: chặn email rác dùng-một-lần, giới hạn 3 đăng ký/IP/ngày, captcha tự bật từ lượt thứ 3 cùng IP, chặn tự giới thiệu, double opt-in bắt buộc, chấm điểm rủi ro ≥50 → cách ly</li>
           <li>• Mật khẩu admin: biến <code className="font-mono">ADMIN_MAT_KHAU</code> (mặc định <code className="font-mono">mgmmax123</code>)</li>

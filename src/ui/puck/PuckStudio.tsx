@@ -45,20 +45,26 @@ export default function PuckStudio({
         headerPath={`/c/${slug}`}
         overrides={{
           headerActions: ({ children }) => (
-            <CongCuMau mauDaLuu={mauDaLuu} luuMau={luuMau} xoaMau={xoaMau}>
-              <a href={`/c/${slug}`} target="_blank" rel="noreferrer"
-                style={{ fontSize: 13, fontWeight: 700, color: "#475569", textDecoration: "none", alignSelf: "center", marginRight: 4 }}>
-                Xem trang ↗
-              </a>
+            <>
               <a href={backHref}
-                style={{ fontSize: 13, fontWeight: 700, color: "#475569", textDecoration: "none", alignSelf: "center", marginRight: 8 }}>
-                Thoát
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 4, alignSelf: "center", marginRight: 8,
+                  padding: "7px 14px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff",
+                  color: "#1e293b", fontSize: 13, fontWeight: 800, textDecoration: "none", whiteSpace: "nowrap",
+                }}>
+                ← Về chiến dịch
               </a>
-              {trangThai === "dang" && <span style={{ fontSize: 13, color: "#2563eb", alignSelf: "center", marginRight: 8 }}>Đang lưu…</span>}
-              {trangThai === "xong" && <span style={{ fontSize: 13, color: "#16a34a", alignSelf: "center", marginRight: 8 }}>✓ Đã xuất bản</span>}
-              {trangThai === "loi" && <span style={{ fontSize: 13, color: "#dc2626", alignSelf: "center", marginRight: 8 }}>Lỗi lưu!</span>}
-              {children}
-            </CongCuMau>
+              <CongCuMau mauDaLuu={mauDaLuu} luuMau={luuMau} xoaMau={xoaMau}>
+                <a href={`/c/${slug}`} target="_blank" rel="noreferrer"
+                  style={{ fontSize: 13, fontWeight: 700, color: "#475569", textDecoration: "none", alignSelf: "center", marginRight: 8, whiteSpace: "nowrap" }}>
+                  Xem trang ↗
+                </a>
+                {trangThai === "dang" && <span style={{ fontSize: 13, color: "#2563eb", alignSelf: "center", marginRight: 8, whiteSpace: "nowrap" }}>Đang lưu…</span>}
+                {trangThai === "xong" && <span style={{ fontSize: 13, color: "#16a34a", alignSelf: "center", marginRight: 8, whiteSpace: "nowrap" }}>✓ Đã xuất bản</span>}
+                {trangThai === "loi" && <span style={{ fontSize: 13, color: "#dc2626", alignSelf: "center", marginRight: 8, whiteSpace: "nowrap" }}>Lỗi lưu!</span>}
+                {children}
+              </CongCuMau>
+            </>
           ),
         }}
       />

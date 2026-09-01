@@ -1,4 +1,32 @@
 import { q, mot } from "@/db";
+import { layCaiDat } from "@/services/cai-dat";
+
+/** Khoá Resend: ưu tiên biến môi trường, sau đó admin đặt trong Cài đặt. */
+async function khoaResend(): Promise<string> {
+  return process.env.RESEND_API_KEY || (await layCaiDat("resend_api_key")) || "";
+}
+async function fromEmail(): Promise<string> {
+  return process.env.EMAIL_FROM || (await layCaiDat("email_from")) || "MGM MAX <onboarding@resend.dev>";
+}
+
+/** Gửi 1 email test trực tiếp qua Resend để kiểm cấu hình (nút trong Cài đặt). */
+export async function guiEmailTest(to: string): Promise<{ ok: boolean; thongTin: string }> {
+  const key = await khoaResend();
+  if (!key) return { ok: false, thongTin: "Chưa cấu hình RESEND_API_KEY (đang ở chế độ giả lập)." };
+  const from = await fromEmail();
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to, subject: "[MGM MAX] Email test cấu hình", text: "Đây là email test từ MGM MAX.\nNếu bạn nhận được, hệ thống email đã chạy thật ✅" }),
+    });
+    if (!res.ok) return { ok: false, thongTin: `Resend ${res.status}: ${(await res.text()).slice(0, 200)}` };
+    const j = await res.json().catch(() => ({} as { id?: string }));
+    return { ok: true, thongTin: `Đã gửi tới ${to} (id: ${(j as { id?: string }).id || "?"}) — kiểm hộp thư (cả Spam).` };
+  } catch (e) {
+    return { ok: false, thongTin: String(e).slice(0, 200) };
+  }
+}
 
 // ————— Mẫu email mặc định (ghi đè được theo chiến dịch trong bảng mau_email) —————
 export const MAU_MAC_DINH: Record<string, { ten: string; tieu_de: string; noi_dung: string }> = {
@@ -75,7 +103,8 @@ export async function xepEmail(
 /** Worker hàng đợi: có RESEND_API_KEY thì gửi thật, không thì đánh dấu giả lập (xem trong Admin). */
 export async function xuLyHangDoi(gioiHan = 20): Promise<number> {
   const cho = await q(`select * from hang_doi_email where trang_thai='cho' and so_lan < 3 order by id limit $1`, [gioiHan]);
-  const key = process.env.RESEND_API_KEY || "";
+  const key = await khoaResend();
+  const from = await fromEmail();
   let daXuLy = 0;
   for (const e of cho) {
     if (!key) {
@@ -88,7 +117,7 @@ export async function xuLyHangDoi(gioiHan = 20): Promise<number> {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: process.env.EMAIL_FROM || "MGM MAX <onboarding@resend.dev>",
+          from,
           to: e.den_email,
           subject: e.tieu_de,
           text: e.noi_dung,

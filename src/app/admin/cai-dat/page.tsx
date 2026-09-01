@@ -1,24 +1,33 @@
-import { Save, ShieldCheck } from "lucide-react";
+import { Mail, Save, Send, ShieldCheck } from "lucide-react";
 import { layCaiDat } from "@/services/cai-dat";
 import { cheDoAI } from "@/services/ai";
 import { yeuCauAdmin } from "../bao-ve";
-import { actLuuCaiDat } from "../actions";
+import { actLuuCaiDat, actGuiEmailTest } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function TrangCaiDat() {
+export default async function TrangCaiDat(props: { searchParams: Promise<{ test?: string }> }) {
   await yeuCauAdmin();
+  const { test = "" } = await props.searchParams;
   const whitelistIp = await layCaiDat("whitelist_ip");
   const blacklistEmail = await layCaiDat("blacklist_email");
   const blacklistIp = await layCaiDat("blacklist_ip");
   const baseUrlAdmin = await layCaiDat("base_url");
+  const emailFrom = await layCaiDat("email_from");
+  const resendAdmin = await layCaiDat("resend_api_key");
   const coEnvBase = !!process.env.APP_BASE_URL;
-  const coResend = !!process.env.RESEND_API_KEY;
+  const coResendEnv = !!process.env.RESEND_API_KEY;
+  const coResend = coResendEnv || !!resendAdmin;
   const che = cheDoAI();
 
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-black text-slate-900">Cài đặt hệ thống</h1>
+
+      {test && (
+        <div className={`mt-4 rounded-xl px-4 py-3 text-sm font-medium ${test.startsWith("✅") ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{test}</div>
+      )}
+
       <form action={actLuuCaiDat} className="the mt-5 space-y-5 p-6">
         <div>
           <label className="nhan">URL công khai (dùng cho link trong email — nguồn tin cậy, không lấy từ header)</label>
@@ -26,6 +35,30 @@ export default async function TrangCaiDat() {
             placeholder="https://ten-mien-cua-anh.vn" />
           <p className="mt-1 text-xs text-slate-400">{coEnvBase ? "Đang lấy từ biến môi trường APP_BASE_URL (ưu tiên cao nhất)." : "Đặt đúng domain thật để link xác minh/mời trong email không bị sai. Trống = dùng http://localhost:3005."}</p>
         </div>
+
+        {/* Hệ thống EMAIL — cấu hình gửi thật ngay trên admin */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <div className="flex items-center gap-2 font-bold text-slate-900"><Mail className="h-4.5 w-4.5 text-blue-600" /> Hệ thống email (gửi thật qua Resend)</div>
+          <p className="mt-1 text-xs text-slate-500">Điền API key của Resend để gửi email thật. Bỏ trống = chế độ giả lập (email chỉ hiện trong Admin → Email).</p>
+          <div className="mt-3 space-y-3">
+            <div>
+              <label className="nhan">Tên người gửi (EMAIL_FROM)</label>
+              <input name="email_from" defaultValue={emailFrom} className="o-nhap text-sm" placeholder="MGM MAX <no-reply@ten-mien-cua-anh.vn>" />
+              <p className="mt-1 text-xs text-slate-400">Trống = dùng <code className="font-mono">onboarding@resend.dev</code> (chỉ gửi được tới chính email tài khoản Resend). Muốn gửi cho khách bất kỳ: xác thực domain ở Resend rồi điền địa chỉ domain đó.</p>
+            </div>
+            <div>
+              <label className="nhan">RESEND_API_KEY</label>
+              <input name="resend_api_key" type="password" autoComplete="off" disabled={coResendEnv} className="o-nhap font-mono text-sm"
+                placeholder={coResendEnv ? "Đang dùng biến môi trường RESEND_API_KEY" : resendAdmin ? "•••••• đã cấu hình — để trống nếu giữ nguyên" : "re_xxxxxxxxxxxxxxxx"} />
+              {coResendEnv ? (
+                <p className="mt-1 text-xs text-slate-400">Đang lấy từ biến môi trường (ưu tiên cao nhất).</p>
+              ) : resendAdmin ? (
+                <label className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500"><input type="checkbox" name="xoa_resend" /> Xoá key hiện tại (về chế độ giả lập)</label>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
         <div>
           <label className="nhan">Whitelist IP (mỗi IP một dòng)</label>
           <textarea name="whitelist_ip" rows={3} defaultValue={whitelistIp} className="o-nhap font-mono text-sm" placeholder="IP của đội vận hành — để tự test không dính giới hạn 3 đăng ký/IP/ngày" />
@@ -41,12 +74,22 @@ export default async function TrangCaiDat() {
         <button className="nut-chinh"><Save className="h-4 w-4" /> Lưu cài đặt</button>
       </form>
 
+      {/* Gửi email test */}
+      <form action={actGuiEmailTest} className="the mt-5 flex flex-wrap items-end gap-3 p-6">
+        <div className="flex-1">
+          <label className="nhan">Gửi email test tới</label>
+          <input name="email_test" type="email" required className="o-nhap text-sm" placeholder={coResend ? "email-cua-ban@gmail.com" : "Cần cấu hình Resend trước"} />
+          <p className="mt-1 text-xs text-slate-400">{coResend ? "Gửi thật ngay để kiểm cấu hình. Với onboarding@resend.dev chỉ gửi được tới email tài khoản Resend." : "Điền API key ở trên và Lưu trước khi gửi test."}</p>
+        </div>
+        <button className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 font-bold text-white hover:bg-slate-900 cursor-pointer"><Send className="h-4 w-4" /> Gửi test</button>
+      </form>
+
       <div className="the mt-5 p-6 text-sm text-slate-600">
         <h2 className="flex items-center gap-2 font-bold text-slate-900"><ShieldCheck className="h-5 w-5 text-blue-600" /> Trạng thái hệ thống</h2>
         <ul className="mt-3 space-y-2">
-          <li>• Gửi email: {coResend ? <b className="text-emerald-600">Resend (thật)</b> : <b className="text-blue-700">Giả lập</b>} — cấu hình qua biến môi trường <code className="font-mono">RESEND_API_KEY</code></li>
+          <li>• Gửi email: {coResend ? <b className="text-emerald-600">Resend (thật){coResendEnv ? " · qua .env" : " · cấu hình trong admin"}</b> : <b className="text-blue-700">Giả lập</b>} — cấu hình ngay ở mục «Hệ thống email» phía trên hoặc biến <code className="font-mono">RESEND_API_KEY</code></li>
           <li>• Referral AI: {che === "cli" ? <b className="text-emerald-600">Claude CLI (gói subscription)</b> : <b className="text-blue-700">Claude API (ANTHROPIC_API_KEY)</b>} — CLI: chạy <code className="font-mono">claude</code> + <code className="font-mono">/login</code> trên máy chủ; hoặc ép chế độ bằng <code className="font-mono">MGM_AI_MODE=cli|api</code></li>
-          <li>• Cron nội bộ chạy 5 phút/lần: tự đóng campaign hết hạn + tự bốc thăm (chờ duyệt), nhắc người im ắng 3 ngày, xử lý email — gọi tay: <code className="font-mono">GET /api/cron</code></li>
+          <li>• Cron nội bộ chạy 5 phút/lần: tự đóng campaign hết hạn + tự bốc thăm (chờ duyệt), nhắc người im ắng 3 ngày, xử lý email — gọi tay: <code className="font-mono">GET /api/cron</code> (cần <code className="font-mono">CRON_SECRET</code>)</li>
           <li>• Chống gian lận đang bật: chặn email rác dùng-một-lần, giới hạn 3 đăng ký/IP/ngày, captcha tự bật từ lượt thứ 3 cùng IP, chặn tự giới thiệu, double opt-in bắt buộc, chấm điểm rủi ro ≥50 → cách ly</li>
           <li>• Mật khẩu admin: biến <code className="font-mono">ADMIN_MAT_KHAU</code> (mặc định <code className="font-mono">mgmmax123</code>)</li>
           <li>• Múi giờ tính "ngày" cho điểm share/click: <b>Asia/Ho_Chi_Minh</b></li>

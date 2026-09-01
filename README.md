@@ -107,6 +107,10 @@ pnpm build && pnpm start &
 | **`CRON_SECRET`** | **Bắt buộc khi deploy thật** — bảo vệ `/api/cron` |
 | **`APP_BASE_URL`** | **Bắt buộc khi deploy thật** — URL công khai cho link trong email (hoặc điền “URL công khai” trong Cài đặt) |
 
+**Cấu hình ngay trong Admin → Cài đặt** (không cần sửa `.env`): URL công khai, **Hệ thống email** (RESEND_API_KEY + EMAIL_FROM) kèm nút **Gửi email test**, whitelist/blacklist. Biến môi trường (nếu có) luôn được ưu tiên.
+
+![Cài đặt hệ thống + email](docs/anh/cai-dat-email.png)
+
 > Chiến dịch có **chế độ demo**: hiện nút “Xác minh ngay” trên trang cảm ơn để chạy thử trọn vòng lặp không cần hộp thư thật.
 
 ## 🏗️ Kiến trúc

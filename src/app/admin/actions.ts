@@ -6,7 +6,7 @@ import { mot, q } from "@/db";
 import { dangNhapAdmin, dangXuatAdmin, laAdmin } from "@/services/auth";
 import { ghiCaiDat } from "@/services/cai-dat";
 import { ghiDiem } from "@/services/diem";
-import { render, xuLyHangDoi } from "@/services/email";
+import { render, xuLyHangDoi, guiEmailTest } from "@/services/email";
 import { dangKyNhanh, xacNhanGioiThieu } from "@/services/nguoi-tham-gia";
 import { chayBocTham, chiDinhWinner, duyetBocTham } from "@/services/boc-tham-svc";
 import { taoChienDichBangAI } from "@/services/ai";
@@ -231,7 +231,21 @@ export async function actLuuCaiDat(form: FormData) {
   await ghiCaiDat("blacklist_ip", String(form.get("blacklist_ip") || ""));
   // URL công khai TIN CẬY để nhúng vào email (chỉ admin đặt; không lấy từ header người dùng — C4)
   await ghiCaiDat("base_url", String(form.get("base_url") || "").trim().replace(/\/$/, ""));
+  // Hệ thống email — cấu hình gửi thật ngay trên admin (không cần .env)
+  await ghiCaiDat("email_from", String(form.get("email_from") || "").trim());
+  const rk = String(form.get("resend_api_key") || "").trim();
+  if (form.get("xoa_resend")) await ghiCaiDat("resend_api_key", "");
+  else if (rk) await ghiCaiDat("resend_api_key", rk);
   revalidatePath("/admin/cai-dat");
+}
+
+// Gửi 1 email test để kiểm cấu hình Resend (nút trong Cài đặt).
+export async function actGuiEmailTest(form: FormData) {
+  await canAdmin();
+  const to = String(form.get("email_test") || "").trim();
+  if (!to) redirect(`/admin/cai-dat?test=${encodeURIComponent("Chưa nhập email nhận")}`);
+  const kq = await guiEmailTest(to);
+  redirect(`/admin/cai-dat?test=${encodeURIComponent((kq.ok ? "✅ " : "❌ ") + kq.thongTin)}`);
 }
 
 // ————— F1/F5/F7/F44 — giao diện, share message, trường form, webhook —————

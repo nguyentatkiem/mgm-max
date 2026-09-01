@@ -35,6 +35,8 @@ Mỗi chiến dịch có một trình dựng trang **kéo-thả trực quan** (d
 
 **Referral AI** — tạo trọn chiến dịch (tên, mô tả, mốc quà, lời mời từng kênh) bằng một câu mô tả. Gọi Claude qua **CLI gói subscription** (không tốn API key) hoặc `@anthropic-ai/sdk` khi có `ANTHROPIC_API_KEY`.
 
+![Tạo chiến dịch bằng AI](docs/anh/ai-dang-sinh.png)
+
 **Chống gian lận & bảo mật**
 - Double opt-in (xác minh email mới tính điểm), captcha toán **tự bật** khi 1 IP đăng ký nhiều lần, blacklist IP, chấm điểm rủi ro → cách ly.
 - Link một-chạm `/nhanh/[slug]` cần **token HMAC của chiến dịch** + giới hạn IP/ngày.

@@ -1,7 +1,8 @@
-import { Sparkles, TerminalSquare, Wand2 } from "lucide-react";
+import { Sparkles, TerminalSquare } from "lucide-react";
 import { yeuCauAdmin } from "../bao-ve";
 import { cheDoAI } from "@/services/ai";
 import { actTaoBangAI } from "../actions";
+import NutSinh from "./NutSinh";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +41,7 @@ export default async function TrangAI(props: { searchParams: Promise<{ loi?: str
           <input name="doi_tuong" required className="o-nhap" placeholder="VD: dân văn phòng 25–40 tuổi muốn tăng năng suất" /></div>
         <div><label className="nhan">Ý tưởng quà / ngân sách (tuỳ chọn)</label>
           <input name="goi_y_qua" className="o-nhap" placeholder="VD: ebook, mã giảm giá tối đa 50%, 1 suất học miễn phí" /></div>
-        <button className="nut-chinh w-full">
-          <Wand2 className="h-4 w-4" /> Sinh chiến dịch (Claude {MODEL_LABEL}, ~30–60 giây)
-        </button>
+        <NutSinh modelLabel={MODEL_LABEL} />
         <p className="text-center text-xs text-slate-400">Chiến dịch sinh ra ở trạng thái NHÁP — anh xem lại, chỉnh sửa rồi mới bấm Chạy.</p>
       </form>
 

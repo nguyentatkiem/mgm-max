@@ -8,6 +8,7 @@ import { layIp } from "@/services/http";
 import { soDangKyIpHomNay } from "@/services/nguoi-tham-gia";
 import { taoCaptcha, NGUONG_CAPTCHA } from "@/services/captcha";
 import DemNguoc from "@/ui/DemNguoc";
+import { laAdmin } from "@/services/auth";
 import { Render } from "@puckeditor/core/rsc";
 import { config, coLayout, type MetaTrang } from "@/ui/puck/config";
 
@@ -49,19 +50,32 @@ export default async function TrangDangKy(props: {
     if (nguoiCu) redirect(`/toi/${nguoiCu.ma}`);
   }
 
-  // Trang "campaign đã đóng" — vẫn hứng người đến muộn
-  if (cd.trang_thai !== "chay") {
+  // Trạng thái ≠ "chạy": ADMIN vẫn xem được BẢN XEM TRƯỚC (để duyệt trước khi mở);
+  // khách thường thấy thông báo đúng ngữ cảnh (nháp = sắp mở, còn lại = đã kết thúc).
+  const daAdmin = await laAdmin();
+  const xemTruoc = cd.trang_thai !== "chay" && daAdmin;
+  if (cd.trang_thai !== "chay" && !daAdmin) {
     if (cd.redirect_khi_dong) redirect(cd.redirect_khi_dong);
+    const chuaMo = cd.trang_thai === "nhap";
     return (
       <main className="mx-auto max-w-lg px-4 py-20 text-center">
         <div className="the p-8">
           <Lock className="mx-auto h-10 w-10 text-slate-300" />
           <h1 className="mt-4 text-2xl font-black text-slate-900">{cd.ten}</h1>
-          <p className="mt-2 text-slate-500">Chương trình đã kết thúc. Hẹn gặp bạn ở đợt sau!</p>
+          <p className="mt-2 text-slate-500">
+            {chuaMo ? "Chương trình sắp mở — hẹn gặp bạn sớm!" : "Chương trình đã kết thúc. Hẹn gặp bạn ở đợt sau!"}
+          </p>
         </div>
       </main>
     );
   }
+
+  // Băng "bản xem trước" cho admin khi campaign chưa chạy
+  const bannerXemTruoc = xemTruoc ? (
+    <div style={{ position: "sticky", top: 0, zIndex: 50, background: "#f59e0b", color: "#fff", textAlign: "center", padding: "8px 12px", fontSize: 13, fontWeight: 700 }}>
+      ⚠ Bản xem trước — chiến dịch đang {cd.trang_thai === "nhap" ? "ở trạng thái NHÁP (chưa xuất bản)" : `ở trạng thái ${String(cd.trang_thai).toUpperCase()}`}. Vào Thiết lập bấm “CHẠY CHIẾN DỊCH” để mở cho công chúng.
+    </div>
+  ) : null;
 
   const cacMoc = await q(`select nguong, ten_qua from moc_qua where chien_dich_id=$1 order by nguong`, [cd.id]);
   const soThamGia = await mot<{ so: string }>(`select count(*) as so from nguoi_tham_gia where chien_dich_id=$1 and xac_minh`, [cd.id]);
@@ -93,6 +107,7 @@ export default async function TrangDangKy(props: {
     };
     return (
       <main style={{ minHeight: "100vh" }}>
+        {bannerXemTruoc}
         {cd.ma_header_dang_ky && <ChenMa ma={cd.ma_header_dang_ky} />}
         <Render config={config} data={cd.layout_json} metadata={md as unknown as Record<string, unknown>} />
       </main>
@@ -101,6 +116,7 @@ export default async function TrangDangKy(props: {
 
   return (
     <main className="min-h-screen bg-slate-50" style={{ background: `linear-gradient(180deg, ${mau} 0%, ${mau}cc 38%, ${nenDuoi} 62%)` }}>
+      {bannerXemTruoc}
       {cd.ma_header_dang_ky && <ChenMa ma={cd.ma_header_dang_ky} />}
       <div className="mx-auto max-w-xl px-4 py-12">
         <div className="text-center text-white">

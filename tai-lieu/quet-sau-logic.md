@@ -2,6 +2,27 @@
 
 > Chạy 9 agent review song song mức `max` trên `src/`. Dưới đây là các phát hiện đã gom nhóm, khử trùng lặp, xếp theo mức độ. **Chưa sửa — chờ duyệt.**
 
+## ✅ KẾT QUẢ CHẠY THỬ THẬT (01/09/2026)
+
+Đã chạy thử end-to-end thật (không phải lý thuyết):
+
+**Luồng nghiệp vụ — ĐÚNG 100%** (curl thật + kiểm DB): A đăng ký → xác minh → B đăng ký qua link A → xác minh. Kết quả: A tổng **132 điểm** đúng từng nguồn (10 đăng ký + 100 mời + 5 share + 2 click + 15 nhiệm vụ); mốc 1 bạn tự trao coupon `GIAM20-C3D4`; B nhận quà chào mừng hai chiều `WELCOME10`; share lần 2 chặn đúng (idempotent/ngày); đáp án nhiệm vụ sai chặn đúng; captcha tự bật khi IP vượt ngưỡng.
+
+**Nút bấm admin — 18/18 PASS** (Playwright click thật + kiểm DB): đăng nhập · wizard 2 bước tạo chiến dịch · đổi tên inline · thêm mốc quà (hiện ngay không cần F5 — `force-dynamic` che được bug revalidate) · nạp coupon · lưu cấu hình điểm · lưu thưởng giới thiệu · lưu giải đặc biệt · thêm nhiệm vụ · toggle email · editor lưu (nút cam) · **CHẠY CHIẾN DỊCH** · 6 mục Báo cáo · 4 tab Người tham gia · chạy bốc thăm · xoá chiến dịch.
+
+**Bảo mật — đã XÁC NHẬN THẬT bằng tấn công:**
+- 🔴 C1 `/nhanh` — 5 bot cùng IP → điểm người mời nhảy **132→632**, **0 bị cách ly**. LỖ HỔNG THẬT.
+- 🔴 C2 `/api/cron` ẩn danh → HTTP 200, chạy được. LỖ HỔNG THẬT.
+- 🔴 C3 `popup.js` — payload `alert(document.domain)` lọt nguyên vào JS. XSS THẬT.
+- 🔴 C4 `base_url` poisoning — email xác minh nạn nhân trỏ `http://evil-phishing.com` (đã khôi phục sau test). LỖ HỔNG THẬT.
+- 🔴 C6 campaign `tam_dung` vẫn cộng điểm share (`congDiem:true`). LỖ HỔNG THẬT.
+- 🔴 C7 nhiệm vụ đáp án rỗng → `dung:true`, +50 điểm miễn phí. LỖ HỔNG THẬT.
+- ✅ C5 admin auth CHẶT: `/admin` chưa login → 307 về đăng nhập; `/api/admin/csv` → 401.
+
+→ 6 lỗ hổng 🔴 (mục 1–7 dưới) **đã kiểm chứng bằng khai thác thật**, không còn là nghi ngờ. Cần vá trước khi mở cho người dùng thật. Dữ liệu test đã dọn sạch, campaign demo nguyên vẹn.
+
+---
+
 ## 🔴 NGHIÊM TRỌNG — vá trước khi chạy thật
 
 ### 1. `/nhanh/[slug]` — endpoint công khai bỏ qua TOÀN BỘ chống gian lận

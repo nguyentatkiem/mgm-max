@@ -3,10 +3,11 @@ import { useState } from "react";
 import { Puck, type Data } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
 import { config, type MetaTrang } from "./config";
+import CongCuMau, { type MauLuu } from "./CongCuMau";
 
 // Trình kéo-thả (client). Nhận server action `luu` để xuất bản data JSON vào DB.
 export default function PuckStudio({
-  id, slug, backHref, data, metadata, luu,
+  id, slug, backHref, data, metadata, luu, mauDaLuu, luuMau, xoaMau,
 }: {
   id: number;
   slug: string;
@@ -14,6 +15,9 @@ export default function PuckStudio({
   data: Data;
   metadata: MetaTrang;
   luu: (id: number, data: Data) => Promise<void>;
+  mauDaLuu: MauLuu[];
+  luuMau: (ten: string, data: Data) => Promise<{ id: number; ten: string }>;
+  xoaMau: (id: number) => Promise<void>;
 }) {
   const [trangThai, setTrangThai] = useState<"" | "dang" | "xong" | "loi">("");
 
@@ -41,7 +45,7 @@ export default function PuckStudio({
         headerPath={`/c/${slug}`}
         overrides={{
           headerActions: ({ children }) => (
-            <>
+            <CongCuMau mauDaLuu={mauDaLuu} luuMau={luuMau} xoaMau={xoaMau}>
               <a href={`/c/${slug}`} target="_blank" rel="noreferrer"
                 style={{ fontSize: 13, fontWeight: 700, color: "#475569", textDecoration: "none", alignSelf: "center", marginRight: 4 }}>
                 Xem trang ↗
@@ -54,7 +58,7 @@ export default function PuckStudio({
               {trangThai === "xong" && <span style={{ fontSize: 13, color: "#16a34a", alignSelf: "center", marginRight: 8 }}>✓ Đã xuất bản</span>}
               {trangThai === "loi" && <span style={{ fontSize: 13, color: "#dc2626", alignSelf: "center", marginRight: 8 }}>Lỗi lưu!</span>}
               {children}
-            </>
+            </CongCuMau>
           ),
         }}
       />

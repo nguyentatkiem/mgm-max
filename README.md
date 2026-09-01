@@ -24,6 +24,20 @@ Mỗi chiến dịch có một trình dựng trang **kéo-thả trực quan** (d
 
 ---
 
+## 🎨 Template toàn diện
+
+Hai lớp mẫu để khởi động trong vài giây:
+
+**Mẫu chiến dịch hoàn chỉnh** — chọn 1 mẫu (Săn giải lớn 🏆 · Danh sách chờ ra mắt ⏳ · Mời bạn mở quà 🎖️ · Đôi bên cùng lợi 🤝 · Viral khoá học 🎓): tạo sẵn **trang kéo-thả đã thiết kế + mốc quà thật + quà chào mừng + giải bốc thăm + nhiệm vụ (đáp án hợp lệ) + lời mời từng kênh**. Xem trước bằng chính trang thật, tạo xong chỉnh vài chữ là chạy.
+
+![Gallery mẫu chiến dịch hoàn chỉnh](docs/anh/mau-gallery.png)
+
+**Thư viện mẫu trang trong editor** — trong trình kéo-thả bấm **Mẫu trang** để áp 1 trong 6 bố cục dựng sẵn (Tối giản · Bán khoá học · Ra mắt · Bốc thăm · Sự kiện · Đầy đủ), hoặc **Lưu mẫu** để cất bố cục đang dựng và tái dùng cho chiến dịch khác.
+
+![Thư viện mẫu trang trong editor](docs/anh/editor-gallery-mau.png)
+
+---
+
 ## 🧩 Tính năng chính
 
 **Vòng lặp viral**

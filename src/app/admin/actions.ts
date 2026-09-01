@@ -10,6 +10,7 @@ import { render, xuLyHangDoi } from "@/services/email";
 import { dangKyNhanh, xacNhanGioiThieu } from "@/services/nguoi-tham-gia";
 import { chayBocTham, chiDinhWinner, duyetBocTham } from "@/services/boc-tham-svc";
 import { taoChienDichBangAI } from "@/services/ai";
+import { timMauToanDien } from "@/ui/mau-toan-dien";
 import { layBaseUrl } from "@/services/http";
 
 async function canAdmin() {
@@ -358,6 +359,53 @@ export async function actSuaEditor(form: FormData) {
      String(form.get("anh_cover") || ""), String(form.get("logo_url") || ""), String(form.get("video_url") || "")]
   );
   revalidatePath(`/admin/editor/${id}`);
+}
+
+// Mẫu chiến dịch TOÀN DIỆN: tạo sẵn campaign + trang kéo-thả + mốc quà + nhiệm vụ + lời mời.
+export async function actTaoTuMauToanDien(form: FormData) {
+  await canAdmin();
+  const m = timMauToanDien(String(form.get("ma") || ""));
+  if (!m) redirect("/admin/moi");
+  let slug = `cd-tmp-${Date.now().toString(36)}`;
+  const cd = await mot<{ id: number }>(
+    `insert into chien_dich (slug, ten, mo_ta, loai_chien_dich, tieu_de_trang, nut_cta, mau_chinh, mau_nen, giai_boc_tham, hai_chieu, qua_chao_mung, qua_chao_mung_gia_tri, loi_moi, layout_json)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb) returning id`,
+    [slug, m.cd.ten, m.cd.moTa, m.loai, m.cd.tieuDe, m.cd.nutCta, m.cd.mauChinh, m.cd.mauNen,
+     m.cd.giaiBocTham, m.cd.haiChieu, m.cd.quaChaoMung, m.cd.quaChaoMungGiaTri,
+     JSON.stringify(m.loiMoi), JSON.stringify(m.layout)]
+  );
+  slug = `cd-${cd!.id}`;
+  await q(`update chien_dich set slug=$2 where id=$1`, [cd!.id, slug]);
+  for (const mq of m.mocQua) {
+    await q(
+      `insert into moc_qua (chien_dich_id, nguong, ten_qua, loai_qua, gia_tri, coupon_dung_chung)
+       values ($1,$2,$3,$4,$5,$6) on conflict (chien_dich_id, nguong) do nothing`,
+      [cd!.id, mq.nguong, mq.tenQua, mq.loaiQua,
+       mq.loaiQua === "file" || mq.loaiQua === "link" ? mq.giaTri : "",
+       mq.loaiQua === "coupon" ? mq.giaTri : ""]
+    );
+  }
+  for (const nv of m.nhiemVu) {
+    await q(
+      `insert into hanh_dong_tuy_chinh (chien_dich_id, ten, mo_ta, url, diem, cau_hoi, dap_an) values ($1,$2,$3,$4,$5,$6,$7)`,
+      [cd!.id, nv.ten, nv.moTa, nv.url, nv.diem, nv.cauHoi, nv.dapAn]
+    );
+  }
+  redirect(`/admin/cd/${cd!.id}/thiet-lap/trang-dang-ky`);
+}
+
+// Lưu trang đang dựng thành MẪU để tái dùng (gọi từ trình kéo-thả).
+export async function actLuuMauTrang(ten: string, data: unknown): Promise<{ id: number; ten: string }> {
+  await canAdmin();
+  const t = (ten || "").trim().slice(0, 80) || "Mẫu chưa đặt tên";
+  const row = await mot<{ id: number }>(`insert into mau_trang (ten, data) values ($1, $2::jsonb) returning id`, [t, JSON.stringify(data || {})]);
+  return { id: row!.id, ten: t };
+}
+
+// Xoá một mẫu trang đã lưu.
+export async function actXoaMauTrang(id: number) {
+  await canAdmin();
+  await q(`delete from mau_trang where id=$1`, [id]);
 }
 
 // Trình kéo-thả (Puck): xuất bản data JSON của trang đăng ký.

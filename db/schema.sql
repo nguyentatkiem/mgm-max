@@ -188,6 +188,14 @@ alter table chien_dich add column if not exists ma_header_chia_se text not null 
 -- Trình kéo-thả (Puck): thiết kế trang đăng ký dạng block, lưu JSON. Rỗng '{}' = dùng giao diện mặc định.
 alter table chien_dich add column if not exists layout_json     jsonb not null default '{}';
 
+-- Mẫu trang người dùng lưu lại từ trình kéo-thả để tái dùng
+create table if not exists mau_trang (
+  id       serial primary key,
+  ten      text not null,
+  data     jsonb not null default '{}',
+  tao_luc  timestamptz not null default now()
+);
+
 create table if not exists theo_doi_nguon (
   id            serial primary key,
   chien_dich_id int not null references chien_dich(id) on delete cascade,

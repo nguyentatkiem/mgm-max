@@ -1,0 +1,161 @@
+-- MGM MAX — schema Postgres
+-- Nguyên tắc: mọi ràng buộc chống trùng nằm ở tầng DB (UNIQUE), không chỉ check ở code.
+
+create table if not exists chien_dich (
+  id            serial primary key,
+  slug          text unique not null,
+  ten           text not null,
+  mo_ta         text not null default '',
+  trang_thai    text not null default 'nhap',          -- nhap | chay | tam_dung | dong
+  ket_thuc_luc  timestamptz,                            -- hạn campaign (bốc thăm); null = evergreen
+  giai_boc_tham text not null default '',               -- tên giải chung cuộc; rỗng = không bốc thăm
+  so_giai       int  not null default 3,                -- số giải khi bốc thăm (nhất/nhì/ba…)
+  cookie_ngay   int  not null default 30,
+  diem_dang_ky  int  not null default 10,
+  diem_moi_ban  int  not null default 100,
+  diem_share    int  not null default 5,                -- bấm nút share (1 lần/kênh/ngày)
+  diem_click    int  not null default 2,                -- mỗi click thật quay lại từ link share
+  cap_click_ngay int not null default 20,
+  kenh_share    text not null default 'zalo,facebook,messenger,telegram,copy',
+  hai_chieu     boolean not null default true,          -- người được mời cũng nhận quà
+  qua_chao_mung text not null default '',               -- tên quà chào mừng cho người được mời
+  qua_chao_mung_gia_tri text not null default '',       -- mã coupon / link của quà chào mừng
+  che_do_demo   boolean not null default true,          -- demo: hiện link xác minh ngay (không cần email thật)
+  redirect_khi_dong text not null default '',
+  tao_luc       timestamptz not null default now()
+);
+
+create table if not exists moc_qua (
+  id            serial primary key,
+  chien_dich_id int not null references chien_dich(id) on delete cascade,
+  nguong        int not null,                           -- số bạn XÁC MINH cần đạt
+  ten_qua       text not null,
+  loai_qua      text not null default 'coupon',         -- coupon | file | link | khac
+  gia_tri       text not null default '',               -- URL file/secret link (loai file/link)
+  coupon_dung_chung text not null default '',           -- nếu có: mã dùng chung cho mọi người
+  unique (chien_dich_id, nguong)
+);
+
+create table if not exists kho_coupon (
+  id       serial primary key,
+  moc_id   int not null references moc_qua(id) on delete cascade,
+  ma       text not null,
+  da_phat  boolean not null default false,
+  nguoi_id int
+);
+
+create table if not exists nguoi_tham_gia (
+  id            serial primary key,
+  chien_dich_id int not null references chien_dich(id) on delete cascade,
+  ten           text not null,
+  email         text not null,
+  ma            text unique not null,                   -- mã giới thiệu riêng (Base32 Crockford)
+  xac_minh      boolean not null default false,
+  token_xac_minh text unique,
+  ip            text not null default '',
+  ua            text not null default '',
+  diem_rui_ro   int  not null default 0,
+  chan          boolean not null default false,         -- blacklist thủ công
+  nguoi_moi_id  int references nguoi_tham_gia(id),
+  kenh_vao      text not null default '',
+  tao_luc       timestamptz not null default now(),
+  xac_minh_luc  timestamptz,
+  unique (chien_dich_id, email)                         -- 1 email / 1 chiến dịch
+);
+
+create table if not exists click_link (
+  id      serial primary key,
+  ma      text not null,
+  kenh    text not null default '',
+  ip      text not null default '',
+  ua      text not null default '',
+  tao_luc timestamptz not null default now()
+);
+create index if not exists idx_click_ma on click_link(ma);
+
+create table if not exists gioi_thieu (
+  id               serial primary key,
+  chien_dich_id    int not null,
+  nguoi_moi_id     int not null references nguoi_tham_gia(id),
+  nguoi_duoc_moi_id int not null unique references nguoi_tham_gia(id),  -- 1 người chỉ 1 người mời
+  trang_thai       text not null default 'cho',        -- cho | xac_minh | cach_ly | huy
+  diem_rui_ro      int not null default 0,
+  ly_do_cach_ly    text not null default '',
+  tao_luc          timestamptz not null default now(),
+  xac_minh_luc     timestamptz
+);
+
+-- Sổ cái điểm: chỉ ghi thêm, không sửa đè. UNIQUE = idempotent.
+create table if not exists so_diem (
+  id            serial primary key,
+  chien_dich_id int not null,
+  nguoi_id      int not null references nguoi_tham_gia(id) on delete cascade,
+  hanh_dong     text not null,
+  doi_tuong     text not null default '',
+  diem          int not null,
+  ghi_chu       text not null default '',
+  tao_luc       timestamptz not null default now(),
+  unique (nguoi_id, hanh_dong, doi_tuong)
+);
+create index if not exists idx_so_diem_nguoi on so_diem(nguoi_id);
+
+create table if not exists hanh_dong_tuy_chinh (
+  id            serial primary key,
+  chien_dich_id int not null references chien_dich(id) on delete cascade,
+  ten           text not null,
+  mo_ta         text not null default '',
+  url           text not null default '',
+  diem          int not null default 10,
+  cau_hoi       text not null default '',               -- câu hỏi xác minh
+  dap_an        text not null default '',               -- đáp án đúng (so khớp không phân hoa thường)
+  bat           boolean not null default true
+);
+
+create table if not exists qua_da_trao (
+  id       serial primary key,
+  nguoi_id int not null references nguoi_tham_gia(id) on delete cascade,
+  moc_id   int references moc_qua(id),
+  loai     text not null default 'moc',                 -- moc | chao_mung | boc_tham | tay
+  ten_qua  text not null,
+  loai_qua text not null default 'khac',
+  gia_tri  text not null default '',                    -- mã coupon đã phát / link nhận
+  tao_luc  timestamptz not null default now()
+);
+create unique index if not exists idx_qua_moc on qua_da_trao(nguoi_id, moc_id) where moc_id is not null;
+
+create table if not exists hang_doi_email (
+  id            serial primary key,
+  chien_dich_id int,
+  loai          text not null,
+  den_email     text not null,
+  den_ten       text not null default '',
+  tieu_de       text not null,
+  noi_dung      text not null,
+  trang_thai    text not null default 'cho',            -- cho | da_gui | gia_lap | loi
+  loi           text not null default '',
+  so_lan        int not null default 0,
+  tao_luc       timestamptz not null default now(),
+  gui_luc       timestamptz
+);
+
+create table if not exists mau_email (
+  chien_dich_id int not null references chien_dich(id) on delete cascade,
+  loai          text not null,
+  tieu_de       text not null,
+  noi_dung      text not null,
+  primary key (chien_dich_id, loai)
+);
+
+create table if not exists boc_tham (
+  id            serial primary key,
+  chien_dich_id int not null references chien_dich(id) on delete cascade,
+  seed          text not null,
+  ket_qua       jsonb not null,
+  trang_thai    text not null default 'cho_duyet',      -- cho_duyet | da_duyet | huy
+  tao_luc       timestamptz not null default now()
+);
+
+create table if not exists cai_dat (
+  khoa    text primary key,
+  gia_tri text not null default ''
+);

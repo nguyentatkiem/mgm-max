@@ -1,0 +1,38 @@
+{
+  "name": "mgm-max",
+  "private": true,
+  "version": "0.1.0",
+  "description": "MGM MAX — cơ chế member-get-member (viral để nhận quà) cho sản phẩm số & khoá học",
+  "scripts": {
+    "dev": "next dev -p 3005",
+    "build": "next build",
+    "start": "next start -p 3005",
+    "test": "vitest run",
+    "db:init": "tsx scripts/khoi-tao-db.ts",
+    "db:seed": "tsx scripts/seed.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "dependencies": {
+    "lucide-react": "^0.542.0",
+    "next": "^15.5.0",
+    "pg": "^8.16.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.15.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}

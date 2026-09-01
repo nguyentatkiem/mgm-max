@@ -33,6 +33,7 @@ export default async function TrafficTheoNguon(props: {
   return (
     <div>
       <h1 className="text-2xl font-black text-slate-900">Traffic theo nguồn</h1>
+      {/* tiêu đề khớp màn "Traffic by source" trong ảnh gốc */}
       <p className="text-sm text-slate-500">Khách ghé đến từ đâu — và nguồn nào thực sự ra đăng ký.</p>
 
       <div className="mt-4 flex gap-2">

@@ -31,8 +31,8 @@ export default async function BaoCaoTongQuan(props: { params: Promise<{ id: stri
 
   return (
     <div>
-      <h1 className="text-2xl font-black text-slate-900">Báo cáo tổng quan</h1>
-      <p className="text-sm text-slate-500">Theo dõi hiệu suất chiến dịch theo thời gian thực.</p>
+      <h1 className="text-2xl font-black text-slate-900">Dashboard</h1>
+      <p className="text-sm text-slate-500">Theo dõi mọi chỉ số quan trọng của chiến dịch theo thời gian thực.</p>
 
       <div className="the mt-5 grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         {cum.map((c) => (

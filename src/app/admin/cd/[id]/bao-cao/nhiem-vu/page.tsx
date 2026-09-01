@@ -24,8 +24,8 @@ export default async function BaoCaoNhiemVu(props: { params: Promise<{ id: strin
 
   return (
     <div>
-      <h1 className="text-2xl font-black text-slate-900">Share &amp; nhiệm vụ</h1>
-      <p className="text-sm text-slate-500">Mức độ tương tác ngoài chuyện mời bạn.</p>
+      <h1 className="text-2xl font-black text-slate-900">Nút hành động</h1>
+      <p className="text-sm text-slate-500">Theo dõi tương tác qua share mạng xã hội và nhiệm vụ cộng điểm.</p>
 
       <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[

@@ -12,7 +12,7 @@ export default async function BaoCaoNguoi(props: { params: Promise<{ id: string 
 
   return (
     <div>
-      <h1 className="text-2xl font-black text-slate-900">Lead theo ngày</h1>
+      <h1 className="text-2xl font-black text-slate-900">Leads</h1>
       <p className="text-sm text-slate-500">So sánh lead đến trực tiếp và lead đến qua giới thiệu.</p>
 
       <div className="the mt-5 p-6"><BieuDoNgay duLieu={duLieu} /></div>

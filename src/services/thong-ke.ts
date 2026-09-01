@@ -83,6 +83,22 @@ export async function bangXepHang(chienDichId: number, gioiHan = 10, cuaNguoiId?
   return { top, toi };
 }
 
+/** F43 — chuỗi 14 ngày: đăng ký + xác minh (tách trực tiếp / từ giới thiệu) cho biểu đồ. */
+export type DiemNgay = { ngay: string; dangKy: number; trucTiep: number; gioiThieu: number };
+
+export async function theoNgay(chienDichId: number, soNgay = 14): Promise<DiemNgay[]> {
+  const rows = await q(
+    `with ngay as (select generate_series(current_date - ($2::int - 1), current_date, interval '1 day')::date as d)
+     select to_char(ngay.d, 'DD/MM') as ngay,
+       (select count(*) from nguoi_tham_gia n where n.chien_dich_id=$1 and n.tao_luc::date=ngay.d) as dang_ky,
+       (select count(*) from nguoi_tham_gia n where n.chien_dich_id=$1 and n.xac_minh_luc::date=ngay.d and n.nguoi_moi_id is null) as truc_tiep,
+       (select count(*) from nguoi_tham_gia n where n.chien_dich_id=$1 and n.xac_minh_luc::date=ngay.d and n.nguoi_moi_id is not null) as gioi_thieu
+     from ngay order by ngay.d`,
+    [chienDichId, soNgay]
+  );
+  return rows.map((r) => ({ ngay: r.ngay, dangKy: Number(r.dang_ky), trucTiep: Number(r.truc_tiep), gioiThieu: Number(r.gioi_thieu) }));
+}
+
 export async function xuatCsv(chienDichId: number): Promise<string> {
   const rows = await q(
     `select n.ten, n.email, n.ma, n.xac_minh, n.kenh_vao, n.tao_luc, n.diem_rui_ro,

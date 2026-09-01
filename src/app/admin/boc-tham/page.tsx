@@ -1,7 +1,7 @@
-import { Dice5, ShieldCheck, X } from "lucide-react";
+import { Dice5, ShieldCheck, UserCheck, X } from "lucide-react";
 import { q } from "@/db";
 import { yeuCauAdmin } from "../bao-ve";
-import { actChayBocTham, actDuyetBocTham, actHuyBocTham } from "../actions";
+import { actChayBocTham, actChiDinhWinner, actDuyetBocTham, actHuyBocTham } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +19,27 @@ export default async function TrangBocTham() {
       <div className="the mt-5 p-6">
         <h2 className="font-bold text-slate-900">Chạy bốc thăm mới</h2>
         {cacCd.length === 0 && <p className="mt-2 text-sm text-slate-400">Chưa có chiến dịch nào cấu hình giải bốc thăm.</p>}
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-3">
           {cacCd.map((cd) => (
-            <form key={cd.id} action={actChayBocTham} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3">
-              <input type="hidden" name="chien_dich_id" value={cd.id} />
+            <div key={cd.id} className="rounded-xl bg-slate-50 px-4 py-3">
               <div className="text-sm"><b>{cd.ten}</b> — {cd.giai_boc_tham} ({cd.so_giai} giải)</div>
-              <button className="nut-chinh !py-1.5 text-sm"><Dice5 className="h-4 w-4" /> Bốc thăm</button>
-            </form>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <form action={actChayBocTham} className="flex items-center gap-2">
+                  <input type="hidden" name="chien_dich_id" value={cd.id} />
+                  <select name="cach" className="o-nhap !w-auto !py-1.5 text-sm">
+                    <option value="trong_so">🎲 Bốc thăm trọng số điểm</option>
+                    <option value="diem_cao">🏆 Theo hạng leaderboard (top 1/2/3…)</option>
+                  </select>
+                  <button className="nut-chinh !py-1.5 text-sm"><Dice5 className="h-4 w-4" /> Chạy</button>
+                </form>
+                <form action={actChiDinhWinner} className="flex items-center gap-2">
+                  <input type="hidden" name="chien_dich_id" value={cd.id} />
+                  <input name="email" type="email" required className="o-nhap !w-52 !py-1.5 text-sm" placeholder="Chỉ định tay: email…" />
+                  <input name="giai" type="number" defaultValue={1} min={1} className="o-nhap !w-16 !py-1.5 text-sm" title="Giải số" />
+                  <button className="nut-phu !py-1.5 text-sm"><UserCheck className="h-4 w-4" /> Chỉ định</button>
+                </form>
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -39,7 +53,9 @@ export default async function TrangBocTham() {
                 <span className={`ml-2 hieu ${b.trang_thai === "da_duyet" ? "bg-emerald-100 text-emerald-700" : b.trang_thai === "huy" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
                   {b.trang_thai === "da_duyet" ? "Đã duyệt & trao giải" : b.trang_thai === "huy" ? "Đã huỷ" : "Chờ duyệt"}
                 </span>
-                <div className="mt-0.5 text-xs text-slate-400">Seed: <code className="font-mono">{b.seed}</code> · {new Date(b.tao_luc).toLocaleString("vi-VN")}</div>
+                <div className="mt-0.5 text-xs text-slate-400">
+                  Cách: <b>{b.cach === "diem_cao" ? "theo hạng" : b.cach === "tay" ? "chỉ định tay" : "trọng số điểm"}</b> · Seed: <code className="font-mono">{b.seed}</code> · {new Date(b.tao_luc).toLocaleString("vi-VN")}
+                </div>
               </div>
               {b.trang_thai === "cho_duyet" && (
                 <div className="flex gap-2">

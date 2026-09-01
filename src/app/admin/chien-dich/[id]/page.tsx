@@ -1,19 +1,26 @@
 import { redirect } from "next/navigation";
-import { Gift, Mail, Save, Ticket, Trash2, Zap } from "lucide-react";
+import { Code2, Gift, Mail, Palette, Save, Ticket, Trash2, Upload, Zap } from "lucide-react";
 import { mot, q } from "@/db";
 import { MAU_MAC_DINH } from "@/services/email";
+import { layBaseUrl } from "@/services/http";
 import { yeuCauAdmin } from "../../bao-ve";
 import {
-  actBatTatHanhDong, actLuuMauEmail, actNapCoupon, actSuaChienDich, actThemHanhDong, actThemMoc, actXoaHanhDong, actXoaMoc,
+  actBatTatHanhDong, actImportCsv, actLuuMauEmail, actNapCoupon, actSuaChienDich, actSuaGiaoDien,
+  actThemHanhDong, actThemMoc, actXoaHanhDong, actXoaMoc,
 } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function SuaChienDich(props: { params: Promise<{ id: string }> }) {
+export default async function SuaChienDich(props: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ import?: string }>;
+}) {
   await yeuCauAdmin();
   const { id } = await props.params;
+  const { import: ketQuaImport } = await props.searchParams;
   const cd = await mot(`select * from chien_dich where id=$1`, [Number(id)]);
   if (!cd) redirect("/admin/chien-dich");
+  const baseUrl = await layBaseUrl();
   const cacMoc = await q(
     `select m.*, (select count(*) from kho_coupon k where k.moc_id=m.id and not k.da_phat) as con_ma,
             (select count(*) from kho_coupon k where k.moc_id=m.id) as tong_ma
@@ -66,6 +73,83 @@ export default async function SuaChienDich(props: { params: Promise<{ id: string
         </div>
         <button className="nut-chinh"><Save className="h-4 w-4" /> Lưu cấu hình</button>
       </form>
+
+      {/* F1 + F5 + F7 + F44 — Giao diện & chia sẻ */}
+      <form action={actSuaGiaoDien} className="the space-y-4 p-6">
+        <h2 className="flex items-center gap-2 font-bold text-slate-900"><Palette className="h-5 w-5 text-blue-600" /> Giao diện trang &amp; lời mời từng kênh</h2>
+        <input type="hidden" name="id" value={cd.id} />
+        <input type="hidden" name="kenh_share_hien_tai" value={cd.kenh_share} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div><label className="nhan">Màu chủ đạo</label><input name="mau_chinh" type="color" defaultValue={cd.mau_chinh || "#2563eb"} className="o-nhap !h-11 !p-1" /></div>
+          <div className="col-span-3"><label className="nhan">Logo (URL ảnh)</label><input name="logo_url" defaultValue={cd.logo_url} className="o-nhap" placeholder="https://…/logo.png" /></div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="nhan">Ảnh cover trang đăng ký (URL)</label><input name="anh_cover" defaultValue={cd.anh_cover} className="o-nhap" placeholder="https://…/cover.jpg" /></div>
+          <div><label className="nhan">Video giới thiệu (link YouTube)</label><input name="video_url" defaultValue={cd.video_url} className="o-nhap" placeholder="https://youtube.com/watch?v=…" /></div>
+        </div>
+        <div className="rounded-xl bg-slate-50 p-4">
+          <div className="text-sm font-bold text-slate-700">Preview khi share (OG) — hiện trên Zalo/Facebook khi link được gửi đi</div>
+          <div className="mt-2 grid gap-3 sm:grid-cols-3">
+            <input name="og_tieu_de" defaultValue={cd.og_tieu_de} className="o-nhap !py-2 text-sm" placeholder="Tiêu đề OG (trống = tên chiến dịch)" />
+            <input name="og_mo_ta" defaultValue={cd.og_mo_ta} className="o-nhap !py-2 text-sm" placeholder="Mô tả OG" />
+            <input name="og_anh" defaultValue={cd.og_anh} className="o-nhap !py-2 text-sm" placeholder="Ảnh OG (URL)" />
+          </div>
+        </div>
+        <div className="rounded-xl bg-slate-50 p-4">
+          <div className="text-sm font-bold text-slate-700">Lời mời soạn sẵn theo từng kênh (trống = dùng lời mời chung)</div>
+          <div className="mt-2 space-y-2">
+            {cd.kenh_share.split(",").filter(Boolean).map((k: string) => (
+              <div key={k} className="flex items-center gap-2">
+                <span className="hieu w-24 justify-center bg-slate-200 capitalize text-slate-600">{k}</span>
+                <input name={`loi_moi_${k}`} defaultValue={(cd.loi_moi || {})[k] || ""} className="o-nhap !py-1.5 text-sm" placeholder={`Lời mời khi share qua ${k}…`} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="nhan">Trường form thêm (mỗi dòng 1 trường, * đầu dòng = bắt buộc)</label>
+            <textarea name="truong_them" rows={3} className="o-nhap font-mono text-sm"
+              defaultValue={(cd.truong_them || []).map((t: { ten: string; bat_buoc: boolean }) => (t.bat_buoc ? "*" : "") + t.ten).join("\n")}
+              placeholder={"*Số điện thoại\nNghề nghiệp"} />
+          </div>
+          <div>
+            <label className="nhan">Webhook URL (bắn sự kiện: lead.xac_minh, gioi_thieu.xac_minh, moc.mo_khoa, boc_tham.trung_giai)</label>
+            <input name="webhook_url" defaultValue={cd.webhook_url} className="o-nhap font-mono text-sm" placeholder="https://he-thong-cua-anh.vn/webhook" />
+          </div>
+        </div>
+        <button className="nut-chinh"><Save className="h-4 w-4" /> Lưu giao diện &amp; chia sẻ</button>
+      </form>
+
+      {/* F3 + F14 + F15 — Nhúng, kích hoạt list cũ, import */}
+      <div className="the space-y-5 p-6">
+        <h2 className="flex items-center gap-2 font-bold text-slate-900"><Code2 className="h-5 w-5 text-blue-600" /> Nhúng vào website &amp; kích hoạt list có sẵn</h2>
+        <div>
+          <div className="text-sm font-bold text-slate-700">Nhúng form (iframe)</div>
+          <pre className="mt-1 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-emerald-300">{`<iframe src="${baseUrl}/nhung/${cd.slug}" width="100%" height="520" style="border:0;border-radius:12px"></iframe>`}</pre>
+          <div className="mt-3 text-sm font-bold text-slate-700">Popup nút nổi (1 dòng script)</div>
+          <pre className="mt-1 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-emerald-300">{`<script src="${baseUrl}/nhung/${cd.slug}/popup.js" defer></script>`}</pre>
+        </div>
+        <div>
+          <div className="text-sm font-bold text-slate-700">Link one-click cho list email CÓ SẴN (F14)</div>
+          <p className="mt-0.5 text-xs text-slate-500">Gửi qua hệ thống email của anh — người nhận bấm là vào thẳng trang mời bạn, khỏi điền form, khỏi xác minh. Thay {"{{EMAIL}}/{{TEN}}"} bằng merge tag của ESP.</p>
+          <pre className="mt-1 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-emerald-300">{`${baseUrl}/nhanh/${cd.slug}?email={{EMAIL}}&ten={{TEN}}`}</pre>
+        </div>
+        <div>
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Upload className="h-4 w-4" /> Import lead từ CSV (UpViral không làm được)</div>
+          {ketQuaImport && (
+            <div className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+              ✓ Import xong: {ketQuaImport.split("-")[0]} người mới, {ketQuaImport.split("-")[1]} bỏ qua (trùng/lỗi).
+            </div>
+          )}
+          <form action={actImportCsv} className="mt-2">
+            <input type="hidden" name="chien_dich_id" value={cd.id} />
+            <textarea name="du_lieu" rows={4} required className="o-nhap font-mono text-sm"
+              placeholder={"Mỗi dòng: ten,email[,ma_nguoi_moi]\nNguyễn Văn A,a@gmail.com\nTrần B,b@gmail.com,ABC12345"} />
+            <button className="nut-chinh mt-2 !py-2 text-sm"><Upload className="h-4 w-4" /> Import (đã xác minh sẵn, không gửi email)</button>
+          </form>
+        </div>
+      </div>
 
       {/* Mốc quà */}
       <div className="the p-6">

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mot } from "@/db";
 import { dangKy } from "@/services/nguoi-tham-gia";
+import { kiemTraCaptcha } from "@/services/captcha";
 
 export async function POST(req: NextRequest) {
   const form = await req.formData();
   const slug = String(form.get("slug") || "");
+  const nhung = String(form.get("nhung") || "");
   const proto = req.headers.get("x-forwarded-proto") || "http";
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "localhost:3005";
   const baseUrl = `${proto}://${host}`;
@@ -15,6 +18,19 @@ export async function POST(req: NextRequest) {
   const cdId = String(form.get("cd_id") || "");
   if (cdId) maCookie = req.cookies.get(`mgm_ref_${cdId}`)?.value || "";
 
+  // F7 — trường tuỳ chỉnh: them_0, them_1… map về tên trường thật
+  const cd = await mot(`select truong_them from chien_dich where slug=$1`, [slug]);
+  const duLieuThem: Record<string, string> = {};
+  const truongThem: { ten: string }[] = cd?.truong_them || [];
+  truongThem.forEach((t, i) => {
+    const v = String(form.get(`them_${i}`) || "").trim();
+    if (v) duLieuThem[t.ten] = v.slice(0, 300);
+  });
+
+  // F33 — captcha (nếu form có)
+  const captchaToken = String(form.get("captcha_token") || "");
+  const captchaHopLe = captchaToken ? kiemTraCaptcha(captchaToken, String(form.get("captcha_tra_loi") || "")) : false;
+
   const kq = await dangKy({
     slug,
     ten: String(form.get("ten") || ""),
@@ -23,11 +39,17 @@ export async function POST(req: NextRequest) {
     kenh: String(form.get("kenh") || ""),
     ip: (req.headers.get("x-forwarded-for") || "").split(",")[0].trim(),
     ua: req.headers.get("user-agent") || "",
-    baseUrl,
+    baseUrl, duLieuThem, captchaHopLe,
   });
 
-  if (!kq.ok) return NextResponse.redirect(new URL(`/c/${slug}?loi=${encodeURIComponent(kq.loi)}`, baseUrl), 303);
-  if (kq.daXacMinh) return NextResponse.redirect(new URL(`/toi/${kq.ma}`, baseUrl), 303);
+  const goc = nhung ? `/nhung/${slug}` : `/c/${slug}`;
+  if (!kq.ok) return NextResponse.redirect(new URL(`${goc}?loi=${encodeURIComponent(kq.loi)}`, baseUrl), 303);
+  if (kq.daXacMinh) {
+    const res = NextResponse.redirect(new URL(`/toi/${kq.ma}`, baseUrl), 303);
+    res.cookies.set(`mgm_toi_${kq.cdId}`, kq.ma, { maxAge: 180 * 24 * 3600, path: "/", sameSite: "lax" });
+    return res;
+  }
   const demoQ = kq.demo ? `&t=${kq.token}` : "";
-  return NextResponse.redirect(new URL(`/c/${slug}/cam-on?ma=${kq.ma}${demoQ}`, baseUrl), 303);
+  const nhungQ = nhung ? "&nhung=1" : "";
+  return NextResponse.redirect(new URL(`/c/${slug}/cam-on?ma=${kq.ma}${demoQ}${nhungQ}`, baseUrl), 303);
 }

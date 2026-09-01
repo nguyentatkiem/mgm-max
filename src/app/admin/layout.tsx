@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { Dice5, Gauge, LogOut, Mail, Megaphone, Rocket, Settings, Users } from "lucide-react";
+import { Dice5, Gauge, LogOut, Mail, Megaphone, Rocket, Settings, Sparkles, Users } from "lucide-react";
 import { laAdmin } from "@/services/auth";
 import { actDangXuat } from "./actions";
 
 const MUC = [
   { href: "/admin", ten: "Tổng quan", icon: Gauge },
   { href: "/admin/chien-dich", ten: "Chiến dịch", icon: Megaphone },
+  { href: "/admin/ai", ten: "Tạo bằng AI", icon: Sparkles },
   { href: "/admin/lead", ten: "Người tham gia", icon: Users },
   { href: "/admin/boc-tham", ten: "Bốc thăm", icon: Dice5 },
   { href: "/admin/email", ten: "Email", icon: Mail },

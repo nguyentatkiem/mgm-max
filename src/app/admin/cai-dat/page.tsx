@@ -9,7 +9,9 @@ export default async function TrangCaiDat() {
   await yeuCauAdmin();
   const whitelistIp = await layCaiDat("whitelist_ip");
   const blacklistEmail = await layCaiDat("blacklist_email");
+  const blacklistIp = await layCaiDat("blacklist_ip");
   const coResend = !!process.env.RESEND_API_KEY;
+  const coAI = !!process.env.ANTHROPIC_API_KEY;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -23,6 +25,10 @@ export default async function TrangCaiDat() {
           <label className="nhan">Blacklist email (mỗi email một dòng)</label>
           <textarea name="blacklist_email" rows={3} defaultValue={blacklistEmail} className="o-nhap font-mono text-sm" placeholder="email-xau@vd.com" />
         </div>
+        <div>
+          <label className="nhan">Blacklist IP (mỗi IP một dòng — chặn hẳn không cho đăng ký)</label>
+          <textarea name="blacklist_ip" rows={3} defaultValue={blacklistIp} className="o-nhap font-mono text-sm" placeholder="1.2.3.4" />
+        </div>
         <button className="nut-chinh"><Save className="h-4 w-4" /> Lưu cài đặt</button>
       </form>
 
@@ -30,7 +36,9 @@ export default async function TrangCaiDat() {
         <h2 className="flex items-center gap-2 font-bold text-slate-900"><ShieldCheck className="h-5 w-5 text-blue-600" /> Trạng thái hệ thống</h2>
         <ul className="mt-3 space-y-2">
           <li>• Gửi email: {coResend ? <b className="text-emerald-600">Resend (thật)</b> : <b className="text-blue-700">Giả lập</b>} — cấu hình qua biến môi trường <code className="font-mono">RESEND_API_KEY</code></li>
-          <li>• Chống gian lận đang bật: chặn email rác dùng-một-lần, giới hạn 3 đăng ký/IP/ngày, chặn tự giới thiệu, double opt-in bắt buộc, chấm điểm rủi ro ≥50 → cách ly</li>
+          <li>• Referral AI: {coAI ? <b className="text-emerald-600">Đã có key</b> : <b className="text-amber-600">Chưa có key</b>} — biến <code className="font-mono">ANTHROPIC_API_KEY</code></li>
+          <li>• Cron nội bộ chạy 5 phút/lần: tự đóng campaign hết hạn + tự bốc thăm (chờ duyệt), nhắc người im ắng 3 ngày, xử lý email — gọi tay: <code className="font-mono">GET /api/cron</code></li>
+          <li>• Chống gian lận đang bật: chặn email rác dùng-một-lần, giới hạn 3 đăng ký/IP/ngày, captcha tự bật từ lượt thứ 3 cùng IP, chặn tự giới thiệu, double opt-in bắt buộc, chấm điểm rủi ro ≥50 → cách ly</li>
           <li>• Mật khẩu admin: biến <code className="font-mono">ADMIN_MAT_KHAU</code> (mặc định <code className="font-mono">mgmmax123</code>)</li>
           <li>• Múi giờ tính "ngày" cho điểm share/click: <b>Asia/Ho_Chi_Minh</b></li>
         </ul>

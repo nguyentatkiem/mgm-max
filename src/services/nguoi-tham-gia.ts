@@ -4,16 +4,29 @@ import { chamDiemRuiRo, emailHangLoat, emailRac, NGUONG_CACH_LY } from "@/core/g
 import { mocMoKhoa, mocKeTiep, sapChamMoc, type Moc } from "@/core/moc";
 import { ghiDiem } from "./diem";
 import { xepEmail } from "./email";
-import { layCaiDat } from "./cai-dat";
+import { ghiCaiDat, layCaiDat } from "./cai-dat";
+import { NGUONG_CAPTCHA } from "./captcha";
+import { banWebhook } from "./webhook";
 
 const GIOI_HAN_IP_NGAY = 3;
 
 export type KetQuaDangKy =
-  | { ok: true; ma: string; token: string; demo: boolean; daXacMinh: boolean }
-  | { ok: false; loi: string };
+  | { ok: true; ma: string; token: string; demo: boolean; daXacMinh: boolean; cdId: number }
+  | { ok: false; loi: string; canCaptcha?: boolean };
+
+/** Số lượt đăng ký từ 1 IP trong ngày (để quyết định bật captcha). */
+export async function soDangKyIpHomNay(chienDichId: number, ip: string): Promise<number> {
+  if (!ip) return 0;
+  const r = await mot<{ so: string }>(
+    `select count(*) as so from nguoi_tham_gia where chien_dich_id=$1 and ip=$2 and tao_luc > now() - interval '1 day'`,
+    [chienDichId, ip]
+  );
+  return Number(r?.so || 0);
+}
 
 export async function dangKy(tham: {
   slug: string; ten: string; email: string; maNguoiMoi: string; kenh: string; ip: string; ua: string; baseUrl: string;
+  duLieuThem?: Record<string, string>; captchaHopLe?: boolean;
 }): Promise<KetQuaDangKy> {
   const cd = await mot(`select * from chien_dich where slug=$1`, [tham.slug]);
   if (!cd || cd.trang_thai !== "chay") return { ok: false, loi: "Chiến dịch không tồn tại hoặc đã đóng." };
@@ -23,22 +36,32 @@ export async function dangKy(tham: {
   if (!ten || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, loi: "Tên hoặc email chưa hợp lệ." };
   if (emailRac(email)) return { ok: false, loi: "Vui lòng dùng email thật (không nhận email dùng-một-lần)." };
 
+  // Trường bắt buộc tuỳ chỉnh (F7)
+  const truongThem: { ten: string; bat_buoc: boolean }[] = cd.truong_them || [];
+  for (const t of truongThem) {
+    if (t.bat_buoc && !(tham.duLieuThem?.[t.ten] || "").trim())
+      return { ok: false, loi: `Vui lòng điền «${t.ten}».` };
+  }
+
   // Đã đăng ký rồi → trả lại đúng người cũ (idempotent, không tạo trùng)
   const cu = await mot(`select * from nguoi_tham_gia where chien_dich_id=$1 and email=$2`, [cd.id, email]);
-  if (cu) return { ok: true, ma: cu.ma, token: cu.token_xac_minh || "", demo: cd.che_do_demo, daXacMinh: cu.xac_minh };
+  if (cu) return { ok: true, ma: cu.ma, token: cu.token_xac_minh || "", demo: cd.che_do_demo, daXacMinh: cu.xac_minh, cdId: cd.id };
 
-  // Rate-limit theo IP (trừ IP trong whitelist)
-  const whitelist = (await layCaiDat("whitelist_ip")).split(/\s+/).filter(Boolean);
-  if (tham.ip && !whitelist.includes(tham.ip)) {
-    const dem = await mot<{ so: string }>(
-      `select count(*) as so from nguoi_tham_gia where chien_dich_id=$1 and ip=$2 and tao_luc > now() - interval '1 day'`,
-      [cd.id, tham.ip]
-    );
-    if (Number(dem?.so || 0) >= GIOI_HAN_IP_NGAY)
-      return { ok: false, loi: "Quá nhiều lượt đăng ký từ mạng của bạn hôm nay. Thử lại sau nhé." };
-  }
+  // Blacklist IP + email (F34)
+  const blacklistIp = (await layCaiDat("blacklist_ip")).split(/\s+/).filter(Boolean);
+  if (tham.ip && blacklistIp.includes(tham.ip)) return { ok: false, loi: "Không thể đăng ký từ mạng này." };
   const blacklist = (await layCaiDat("blacklist_email")).split(/\s+/).filter(Boolean);
   if (blacklist.includes(email)) return { ok: false, loi: "Email này không thể tham gia chương trình." };
+
+  // Rate-limit theo IP + captcha tự bật (trừ IP whitelist)
+  const whitelist = (await layCaiDat("whitelist_ip")).split(/\s+/).filter(Boolean);
+  if (tham.ip && !whitelist.includes(tham.ip)) {
+    const dem = await soDangKyIpHomNay(cd.id, tham.ip);
+    if (dem >= GIOI_HAN_IP_NGAY)
+      return { ok: false, loi: "Quá nhiều lượt đăng ký từ mạng của bạn hôm nay. Thử lại sau nhé." };
+    if (dem >= NGUONG_CAPTCHA && !tham.captchaHopLe)
+      return { ok: false, loi: "Vui lòng trả lời đúng câu hỏi xác nhận bên dưới.", canCaptcha: true };
+  }
 
   // Tìm người mời (chặn tự giới thiệu ngay tại cửa)
   let nguoiMoi = null;
@@ -54,9 +77,10 @@ export async function dangKy(tham: {
   for (let lan = 0; lan < 3; lan++) {
     try {
       const moi = await mot(
-        `insert into nguoi_tham_gia (chien_dich_id, ten, email, ma, token_xac_minh, ip, ua, nguoi_moi_id, kenh_vao)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
-        [cd.id, ten, email, ma, token, tham.ip, tham.ua.slice(0, 300), nguoiMoi?.id || null, tham.kenh]
+        `insert into nguoi_tham_gia (chien_dich_id, ten, email, ma, token_xac_minh, ip, ua, nguoi_moi_id, kenh_vao, du_lieu_them)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`,
+        [cd.id, ten, email, ma, token, tham.ip, tham.ua.slice(0, 300), nguoiMoi?.id || null, tham.kenh,
+         JSON.stringify(tham.duLieuThem || {})]
       );
       if (nguoiMoi) {
         await q(
@@ -72,21 +96,82 @@ export async function dangKy(tham: {
     }
   }
 
+  // Nhớ base URL công khai để cron dựng link đúng host (kể cả sau tunnel)
+  ghiCaiDat("base_url", tham.baseUrl).catch(() => {});
+
   await xepEmail(cd.id, "xac_minh", email, ten, {
     ten, ten_chien_dich: cd.ten, link_xac_minh: `${tham.baseUrl}/xac-minh/${token}`,
   });
-  return { ok: true, ma, token, demo: cd.che_do_demo, daXacMinh: false };
+  return { ok: true, ma, token, demo: cd.che_do_demo, daXacMinh: false, cdId: cd.id };
 }
 
-/** Xác minh email → kích hoạt điểm + xử referral + quà hai chiều. Trả về mã để redirect sang trang riêng. */
-export async function xacMinh(token: string, baseUrl: string): Promise<string | null> {
+/** F14/F15 — Đăng ký nhanh cho list CÓ SẴN (one-click link / import CSV):
+ *  bỏ double opt-in (list của chính mình), vào thẳng trạng thái xác minh. */
+export async function dangKyNhanh(tham: {
+  slug: string; ten: string; email: string; maNguoiMoi?: string; kenh: string; baseUrl: string; guiEmail?: boolean;
+}): Promise<{ ok: true; ma: string; cdId: number; moiTao: boolean } | { ok: false; loi: string }> {
+  const cd = await mot(`select * from chien_dich where slug=$1`, [tham.slug]);
+  if (!cd || cd.trang_thai !== "chay") return { ok: false, loi: "Chiến dịch không tồn tại hoặc đã đóng." };
+  const email = tham.email.trim().toLowerCase();
+  const ten = tham.ten.trim() || email.split("@")[0];
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, loi: "Email chưa hợp lệ." };
+
+  const cu = await mot(`select * from nguoi_tham_gia where chien_dich_id=$1 and email=$2`, [cd.id, email]);
+  if (cu) {
+    if (!cu.xac_minh) await q(`update nguoi_tham_gia set xac_minh=true, xac_minh_luc=now() where id=$1`, [cu.id]);
+    return { ok: true, ma: cu.ma, cdId: cd.id, moiTao: false };
+  }
+
+  let nguoiMoi = null;
+  const maNM = chuanHoaMa(tham.maNguoiMoi || "");
+  if (maNM && maHopLe(maNM)) {
+    nguoiMoi = await mot(`select * from nguoi_tham_gia where ma=$1 and chien_dich_id=$2 and email<>$3 and not chan`, [maNM, cd.id, email]);
+  }
+
+  let ma = sinhMa();
+  let nguoiId = 0;
+  for (let lan = 0; lan < 3; lan++) {
+    try {
+      const moi = await mot(
+        `insert into nguoi_tham_gia (chien_dich_id, ten, email, ma, xac_minh, xac_minh_luc, nguoi_moi_id, kenh_vao)
+         values ($1,$2,$3,$4,true,now(),$5,$6) returning id`,
+        [cd.id, ten, email, ma, nguoiMoi?.id || null, tham.kenh]
+      );
+      nguoiId = moi!.id;
+      break;
+    } catch (e: unknown) {
+      if (String(e).includes("nguoi_tham_gia_ma_key")) { ma = sinhMa(); continue; }
+      throw e;
+    }
+  }
+  await ghiDiem(cd.id, nguoiId, "dang_ky", "", cd.diem_dang_ky);
+  if (nguoiMoi) {
+    const gt = await mot(
+      `insert into gioi_thieu (chien_dich_id, nguoi_moi_id, nguoi_duoc_moi_id) values ($1,$2,$3)
+       on conflict (nguoi_duoc_moi_id) do nothing returning id`,
+      [cd.id, nguoiMoi.id, nguoiId]
+    );
+    if (gt) await xacNhanGioiThieu(gt.id, tham.baseUrl, tham.guiEmail !== false);
+  }
+  if (tham.guiEmail !== false) {
+    await xepEmail(cd.id, "chao_mung", email, ten, {
+      ten, ten_chien_dich: cd.ten, link_rieng: `${tham.baseUrl}/toi/${ma}`, qua_chao_mung: "",
+    });
+  }
+  return { ok: true, ma, cdId: cd.id, moiTao: true };
+}
+
+/** Xác minh email → kích hoạt điểm + xử referral + quà hai chiều. */
+export async function xacMinh(token: string, baseUrl: string): Promise<{ ma: string; cdId: number } | null> {
   const ng = await mot(`select * from nguoi_tham_gia where token_xac_minh=$1`, [token]);
   if (!ng) return null;
-  if (ng.xac_minh) return ng.ma; // link bấm lại — vô hại
+  if (ng.xac_minh) return { ma: ng.ma, cdId: ng.chien_dich_id }; // link bấm lại — vô hại
 
   const cd = await mot(`select * from chien_dich where id=$1`, [ng.chien_dich_id]);
   await q(`update nguoi_tham_gia set xac_minh=true, xac_minh_luc=now() where id=$1`, [ng.id]);
   await ghiDiem(cd.id, ng.id, "dang_ky", "", cd.diem_dang_ky);
+  ghiCaiDat("base_url", baseUrl).catch(() => {});
+  banWebhook(cd.webhook_url, "lead.xac_minh", { email: ng.email, ten: ng.ten, ma: ng.ma, chien_dich: cd.slug });
 
   const linkRieng = `${baseUrl}/toi/${ng.ma}`;
   let dongQua = "";
@@ -130,11 +215,12 @@ export async function xacMinh(token: string, baseUrl: string): Promise<string | 
       await xacNhanGioiThieu(gt.id, baseUrl);
     }
   }
-  return ng.ma;
+  return { ma: ng.ma, cdId: ng.chien_dich_id };
 }
 
-/** Công nhận 1 referral: cộng điểm người mời + check mốc quà + email. Dùng cả khi admin duyệt cách ly. */
-export async function xacNhanGioiThieu(gioiThieuId: number, baseUrl: string) {
+/** Công nhận 1 referral: cộng điểm người mời + check mốc quà + email + webhook.
+ *  guiEmail=false khi import list (không spam hộp thư). */
+export async function xacNhanGioiThieu(gioiThieuId: number, baseUrl: string, guiEmail = true) {
   const gt = await mot(`select * from gioi_thieu where id=$1`, [gioiThieuId]);
   if (!gt || gt.trang_thai === "xac_minh") return;
   const cd = await mot(`select * from chien_dich where id=$1`, [gt.chien_dich_id]);
@@ -143,6 +229,7 @@ export async function xacNhanGioiThieu(gioiThieuId: number, baseUrl: string) {
 
   await q(`update gioi_thieu set trang_thai='xac_minh', xac_minh_luc=now() where id=$1`, [gioiThieuId]);
   await ghiDiem(cd.id, nguoiMoi.id, "moi_ban", `gt:${gioiThieuId}`, cd.diem_moi_ban);
+  banWebhook(cd.webhook_url, "gioi_thieu.xac_minh", { nguoi_moi: nguoiMoi.email, chien_dich: cd.slug });
 
   const soBan = await demBanXacMinh(nguoiMoi.id);
   const linkRieng = `${baseUrl}/toi/${nguoiMoi.ma}`;
@@ -153,19 +240,30 @@ export async function xacNhanGioiThieu(gioiThieuId: number, baseUrl: string) {
   for (const moc of mocMoKhoa(soBan, cacMoc, daTrao)) {
     const giaTri = await traoQuaMoc(moc.id, nguoiMoi.id);
     if (giaTri === null) continue; // đã trao rồi (đụng UNIQUE)
-    await xepEmail(cd.id, "mo_qua", nguoiMoi.email, nguoiMoi.ten, {
-      ten: nguoiMoi.ten, ten_chien_dich: cd.ten, ten_qua: moc.ten_qua,
-      gia_tri_qua: giaTri ? `Nhận quà của bạn: ${giaTri}\n` : "", link_rieng: linkRieng,
-    });
+    banWebhook(cd.webhook_url, "moc.mo_khoa", { nguoi: nguoiMoi.email, moc: moc.nguong, qua: moc.ten_qua, gia_tri: giaTri, chien_dich: cd.slug });
+    if (guiEmail) {
+      await xepEmail(cd.id, "mo_qua", nguoiMoi.email, nguoiMoi.ten, {
+        ten: nguoiMoi.ten, ten_chien_dich: cd.ten, ten_qua: moc.ten_qua,
+        gia_tri_qua: giaTri ? `Nhận quà của bạn: ${giaTri}\n` : "", link_rieng: linkRieng,
+      });
+    }
   }
 
-  // Email tiến độ + đòn "sắp chạm mốc"
+  if (!guiEmail) return;
+
+  // F39 — digest: trong vòng 1 giờ chỉ gửi 1 email "mời thành công" cho mỗi người
+  const vuaGui = await mot(
+    `select id from hang_doi_email where loai='moi_thanh_cong' and den_email=$1 and tao_luc > now() - interval '1 hour' limit 1`,
+    [nguoiMoi.email]
+  );
   const ke = mocKeTiep(soBan, cacMoc);
-  const tienDo = ke ? `Còn ${ke.nguong - soBan} bạn nữa là mở khoá «${ke.ten_qua}».\n` : "Bạn đã mở hết các mốc quà!\n";
-  await xepEmail(cd.id, "moi_thanh_cong", nguoiMoi.email, nguoiMoi.ten, {
-    ten: nguoiMoi.ten, ten_chien_dich: cd.ten, so_ban: String(soBan), diem_moi: String(cd.diem_moi_ban),
-    tien_do: tienDo, link_rieng: linkRieng,
-  });
+  if (!vuaGui) {
+    const tienDo = ke ? `Còn ${ke.nguong - soBan} bạn nữa là mở khoá «${ke.ten_qua}».\n` : "Bạn đã mở hết các mốc quà!\n";
+    await xepEmail(cd.id, "moi_thanh_cong", nguoiMoi.email, nguoiMoi.ten, {
+      ten: nguoiMoi.ten, ten_chien_dich: cd.ten, so_ban: String(soBan), diem_moi: String(cd.diem_moi_ban),
+      tien_do: tienDo, link_rieng: linkRieng,
+    });
+  }
   if (sapChamMoc(soBan, cacMoc) && ke) {
     await xepEmail(cd.id, "sap_moc", nguoiMoi.email, nguoiMoi.ten, {
       ten: nguoiMoi.ten, qua_ke_tiep: ke.ten_qua, link_rieng: linkRieng,
@@ -179,8 +277,7 @@ export async function demBanXacMinh(nguoiId: number): Promise<number> {
   return Number(r?.so || 0);
 }
 
-/** Trao quà của 1 mốc: coupon (kho khoá hàng chống phát trùng / dùng chung), file, link, khác.
- *  Trả về giá trị quà; null nếu người này đã được trao mốc này rồi. */
+/** Trao quà của 1 mốc: coupon (kho khoá hàng chống phát trùng / dùng chung), file, link, khác. */
 async function traoQuaMoc(mocId: number, nguoiId: number): Promise<string | null> {
   const client = await pool.connect();
   try {

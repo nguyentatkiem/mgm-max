@@ -38,6 +38,12 @@ export const MAU_MAC_DINH: Record<string, { ten: string; tieu_de: string; noi_du
     noi_dung:
       "Chúc mừng {{ten}}!\n\nBạn đã trúng {{giai}} của chương trình {{ten_chien_dich}}.\nChúng tôi sẽ liên hệ qua email này để trao giải. Xem trang của bạn: {{link_rieng}}",
   },
+  nhac: {
+    ten: "Nhắc người im ắng (3 ngày)",
+    tieu_de: "⏰ {{ten}} ơi, bạn đang ở hạng {{hang}} — đừng để tuột quà!",
+    noi_dung:
+      "Chào {{ten}},\n\nĐã mấy hôm bạn chưa quay lại «{{ten_chien_dich}}». Bạn đang có {{diem}} điểm, hạng {{hang}}.\nChỉ cần mời thêm vài người bạn là mở khoá phần quà kế tiếp.\nVào trang của bạn: {{link_rieng}}",
+  },
 };
 
 export function render(mau: string, bien: Record<string, string>): string {

@@ -6,9 +6,10 @@ import { mot, q } from "@/db";
 import { dangNhapAdmin, dangXuatAdmin, laAdmin } from "@/services/auth";
 import { ghiCaiDat } from "@/services/cai-dat";
 import { ghiDiem } from "@/services/diem";
-import { xuLyHangDoi } from "@/services/email";
-import { xacNhanGioiThieu } from "@/services/nguoi-tham-gia";
-import { chayBocTham, duyetBocTham } from "@/services/boc-tham-svc";
+import { render, xuLyHangDoi } from "@/services/email";
+import { dangKyNhanh, xacNhanGioiThieu } from "@/services/nguoi-tham-gia";
+import { chayBocTham, chiDinhWinner, duyetBocTham } from "@/services/boc-tham-svc";
+import { taoChienDichBangAI } from "@/services/ai";
 import { layBaseUrl } from "@/services/http";
 
 async function canAdmin() {
@@ -185,10 +186,17 @@ export async function actChanNguoi(form: FormData) {
   revalidatePath("/admin/lead");
 }
 
-// ————— Bốc thăm —————
+// ————— Bốc thăm (F26: 2 cách tự động + chỉ định tay) —————
 export async function actChayBocTham(form: FormData) {
   await canAdmin();
-  await chayBocTham(Number(form.get("chien_dich_id")));
+  const cach = String(form.get("cach")) === "diem_cao" ? "diem_cao" as const : "trong_so" as const;
+  await chayBocTham(Number(form.get("chien_dich_id")), cach);
+  revalidatePath("/admin/boc-tham");
+}
+
+export async function actChiDinhWinner(form: FormData) {
+  await canAdmin();
+  await chiDinhWinner(Number(form.get("chien_dich_id")), String(form.get("email") || ""), Number(form.get("giai") || 1));
   revalidatePath("/admin/boc-tham");
 }
 
@@ -215,5 +223,115 @@ export async function actLuuCaiDat(form: FormData) {
   await canAdmin();
   await ghiCaiDat("whitelist_ip", String(form.get("whitelist_ip") || ""));
   await ghiCaiDat("blacklist_email", String(form.get("blacklist_email") || ""));
+  await ghiCaiDat("blacklist_ip", String(form.get("blacklist_ip") || ""));
   revalidatePath("/admin/cai-dat");
+}
+
+// ————— F1/F5/F7/F44 — giao diện, share message, trường form, webhook —————
+export async function actSuaGiaoDien(form: FormData) {
+  await canAdmin();
+  const id = Number(form.get("id"));
+  const kenhShare = String(form.get("kenh_share_hien_tai") || "").split(",").filter(Boolean);
+  const loiMoi: Record<string, string> = {};
+  for (const k of kenhShare) {
+    const v = String(form.get(`loi_moi_${k}`) || "").trim();
+    if (v) loiMoi[k] = v;
+  }
+  const truongThem = String(form.get("truong_them") || "")
+    .split("\n").map((d) => d.trim()).filter(Boolean)
+    .map((d) => ({ ten: d.replace(/^\*/, "").trim(), bat_buoc: d.startsWith("*") }));
+  await q(
+    `update chien_dich set anh_cover=$2, logo_url=$3, mau_chinh=$4, video_url=$5,
+       og_tieu_de=$6, og_mo_ta=$7, og_anh=$8, loi_moi=$9, truong_them=$10, webhook_url=$11 where id=$1`,
+    [id, String(form.get("anh_cover") || ""), String(form.get("logo_url") || ""),
+     String(form.get("mau_chinh") || "#2563eb"), String(form.get("video_url") || ""),
+     String(form.get("og_tieu_de") || ""), String(form.get("og_mo_ta") || ""), String(form.get("og_anh") || ""),
+     JSON.stringify(loiMoi), JSON.stringify(truongThem), String(form.get("webhook_url") || "")]
+  );
+  revalidatePath(`/admin/chien-dich/${id}`);
+}
+
+// ————— F15/F16 — import lead từ CSV (UpViral không làm được) —————
+export async function actImportCsv(form: FormData) {
+  await canAdmin();
+  const cdId = Number(form.get("chien_dich_id"));
+  const cd = await mot(`select slug from chien_dich where id=$1`, [cdId]);
+  const baseUrl = await layBaseUrl();
+  const dong = String(form.get("du_lieu") || "").split("\n").map((d) => d.trim()).filter(Boolean);
+  let taoMoi = 0, boQua = 0;
+  for (const d of dong.slice(0, 1000)) {
+    const [ten, email, maNguoiMoi] = d.split(",").map((p) => p.trim());
+    if (!email && !ten) continue;
+    const kq = await dangKyNhanh({
+      slug: cd!.slug, ten: ten || "", email: email || ten, maNguoiMoi: maNguoiMoi || "",
+      kenh: "import", baseUrl, guiEmail: false,
+    });
+    if (kq.ok && kq.moiTao) taoMoi++; else boQua++;
+  }
+  redirect(`/admin/chien-dich/${cdId}?import=${taoMoi}-${boQua}`);
+}
+
+// ————— F18 — broadcast email (UpViral không có) —————
+export async function actBroadcast(form: FormData) {
+  await canAdmin();
+  const cdId = Number(form.get("chien_dich_id"));
+  const doiTuong = String(form.get("doi_tuong") || "tat_ca");
+  const tieuDe = String(form.get("tieu_de") || "").trim();
+  const noiDung = String(form.get("noi_dung") || "").trim();
+  if (!cdId || !tieuDe || !noiDung) redirect("/admin/email");
+  const baseUrl = await layBaseUrl();
+  const dieuKien =
+    doiTuong === "co_moi" ? `and exists (select 1 from gioi_thieu g where g.nguoi_moi_id=n.id and g.trang_thai='xac_minh')`
+    : doiTuong === "chua_moi" ? `and not exists (select 1 from gioi_thieu g where g.nguoi_moi_id=n.id and g.trang_thai='xac_minh')`
+    : "";
+  const nguoi = await q(
+    `select n.ten, n.email, n.ma, coalesce((select sum(diem) from so_diem s where s.nguoi_id=n.id),0) as diem
+     from nguoi_tham_gia n where n.chien_dich_id=$1 and n.xac_minh and not n.chan ${dieuKien}`, [cdId]);
+  for (const ng of nguoi) {
+    const bien = { ten: ng.ten, diem: String(ng.diem), link_rieng: `${baseUrl}/toi/${ng.ma}` };
+    await q(
+      `insert into hang_doi_email (chien_dich_id, loai, den_email, den_ten, tieu_de, noi_dung) values ($1,'broadcast',$2,$3,$4,$5)`,
+      [cdId, ng.email, ng.ten, render(tieuDe, bien), render(noiDung, bien)]
+    );
+  }
+  await xuLyHangDoi(200);
+  redirect(`/admin/email?broadcast=${nguoi.length}`);
+}
+
+// ————— F51 — Referral AI: sinh trọn chiến dịch bằng Claude —————
+export async function actTaoBangAI(form: FormData) {
+  await canAdmin();
+  const kq = await taoChienDichBangAI({
+    thuongHieu: String(form.get("thuong_hieu") || ""),
+    website: String(form.get("website") || ""),
+    sanPham: String(form.get("san_pham") || ""),
+    doiTuong: String(form.get("doi_tuong") || ""),
+    ganeQua: String(form.get("goi_y_qua") || ""),
+  });
+  if (!kq.ok) redirect(`/admin/ai?loi=${encodeURIComponent(kq.loi)}`);
+  const spec = kq.spec;
+  let slug = (spec.slug || "chien-dich-ai").toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 60);
+  if (await mot(`select 1 from chien_dich where slug=$1`, [slug])) slug = `${slug}-${Date.now().toString(36).slice(-4)}`;
+  const cd = await mot(
+    `insert into chien_dich (slug, ten, mo_ta, giai_boc_tham, qua_chao_mung, qua_chao_mung_gia_tri, loi_moi)
+     values ($1,$2,$3,$4,$5,$6,$7) returning id`,
+    [slug, spec.ten, spec.mo_ta, spec.giai_boc_tham, spec.qua_chao_mung, spec.qua_chao_mung_gia_tri,
+     JSON.stringify(spec.loi_moi || {})]
+  );
+  for (const m of spec.moc_qua || []) {
+    await q(
+      `insert into moc_qua (chien_dich_id, nguong, ten_qua, loai_qua, gia_tri, coupon_dung_chung)
+       values ($1,$2,$3,$4,$5,$6) on conflict (chien_dich_id, nguong) do nothing`,
+      [cd!.id, m.nguong, m.ten_qua, m.loai_qua,
+       m.loai_qua === "file" || m.loai_qua === "link" ? m.goi_y_gia_tri : "",
+       m.loai_qua === "coupon" ? m.goi_y_gia_tri : ""]
+    );
+  }
+  for (const h of spec.hanh_dong || []) {
+    await q(
+      `insert into hanh_dong_tuy_chinh (chien_dich_id, ten, mo_ta, url, diem, cau_hoi, dap_an) values ($1,$2,$3,$4,$5,$6,$7)`,
+      [cd!.id, h.ten, h.mo_ta, h.url, h.diem, h.cau_hoi, h.dap_an]
+    );
+  }
+  redirect(`/admin/chien-dich/${cd!.id}`);
 }

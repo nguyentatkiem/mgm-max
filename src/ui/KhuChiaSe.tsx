@@ -11,8 +11,8 @@ const KENH: Record<string, { ten: string; mau: string; icon: React.ComponentType
 };
 
 export default function KhuChiaSe({
-  ma, linkGoc, loiMoi, kenhBat, diemShare,
-}: { ma: string; linkGoc: string; loiMoi: string; kenhBat: string[]; diemShare: number }) {
+  ma, linkGoc, loiMoi, loiMoiKenh = {}, kenhBat, diemShare,
+}: { ma: string; linkGoc: string; loiMoi: string; loiMoiKenh?: Record<string, string>; kenhBat: string[]; diemShare: number }) {
   const [daCopy, setDaCopy] = useState(false);
   const [thongBao, setThongBao] = useState("");
 
@@ -35,7 +35,8 @@ export default function KhuChiaSe({
 
   function moKenh(kenh: string) {
     const link = encodeURIComponent(`${linkGoc}?ch=${kenh}`);
-    const text = encodeURIComponent(loiMoi);
+    // F5 — lời mời soạn riêng từng kênh (admin cấu hình), fallback lời mời chung
+    const text = encodeURIComponent(loiMoiKenh[kenh] || loiMoi);
     ghiShare(kenh);
     if (kenh === "facebook") window.open(`https://www.facebook.com/sharer/sharer.php?u=${link}&quote=${text}`, "_blank");
     else if (kenh === "messenger") window.open(`fb-messenger://share?link=${link}`, "_blank");

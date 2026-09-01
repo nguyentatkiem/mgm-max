@@ -43,10 +43,11 @@ export default async function TrangCuaToi(props: {
   const qrSvg = await QRCode.toString(linkRieng + "?ch=qr", { type: "svg", margin: 1, width: 120, color: { dark: "#1e3a8a", light: "#ffffff" } });
   const mocLonNhat = cacMoc.length ? cacMoc[cacMoc.length - 1].nguong : 10;
   const loiMoi = `Mình đang tham gia "${cd.ten}" — đăng ký qua link của mình để cả hai cùng có quà nhé!`;
+  const loiMoiKenh: Record<string, string> = cd.loi_moi || {}; // F5 — lời mời riêng từng kênh
 
   return (
     <main className="min-h-screen bg-slate-50 pb-16">
-      <div className="bg-gradient-to-r from-blue-700 to-blue-500 px-4 pb-16 pt-10 text-white">
+      <div className="px-4 pb-16 pt-10 text-white" style={{ background: `linear-gradient(90deg, ${cd.mau_chinh || "#1d4ed8"}, ${cd.mau_chinh || "#3b82f6"}cc)` }}>
         <div className="mx-auto max-w-2xl">
           {moi && (
             <div className="mb-4 flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-semibold backdrop-blur">
@@ -86,7 +87,7 @@ export default async function TrangCuaToi(props: {
             <div className="hidden shrink-0 rounded-xl border border-slate-200 p-1 sm:block" dangerouslySetInnerHTML={{ __html: qrSvg }} />
           </div>
           <div className="mt-4">
-            <KhuChiaSe ma={ng.ma} linkGoc={linkRieng} loiMoi={loiMoi} kenhBat={cd.kenh_share.split(",")} diemShare={cd.diem_share} />
+            <KhuChiaSe ma={ng.ma} linkGoc={linkRieng} loiMoi={loiMoi} loiMoiKenh={loiMoiKenh} kenhBat={cd.kenh_share.split(",")} diemShare={cd.diem_share} />
           </div>
         </section>
 

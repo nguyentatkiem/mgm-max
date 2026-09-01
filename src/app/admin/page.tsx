@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Download, MousePointerClick, ShieldAlert, TrendingUp, UserCheck, UserPlus, Users } from "lucide-react";
 import { q, mot } from "@/db";
-import { tongQuan } from "@/services/thong-ke";
+import { theoNgay, tongQuan } from "@/services/thong-ke";
+import BieuDoNgay from "@/ui/BieuDoNgay";
 import { yeuCauAdmin } from "./bao-ve";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export default async function TrangTongQuan(props: { searchParams: Promise<{ cd?
   }
   const cd = (cdQuery && cacCd.find((c) => String(c.id) === cdQuery)) || cacCd[0];
   const s = await tongQuan(cd.id);
+  const duLieuNgay = await theoNgay(cd.id, 14);
   const emailCho = await mot<{ so: string }>(`select count(*) as so from hang_doi_email where trang_thai='cho'`);
 
   const buoc = [
@@ -77,6 +79,11 @@ export default async function TrangTongQuan(props: { searchParams: Promise<{ cd?
             <div className="mt-0.5 text-xs text-slate-400">{o.mota}</div>
           </div>
         ))}
+      </div>
+
+      {/* F43 — biểu đồ theo ngày */}
+      <div className="the mt-6 p-6">
+        <BieuDoNgay duLieu={duLieuNgay} />
       </div>
 
       {/* Phễu */}

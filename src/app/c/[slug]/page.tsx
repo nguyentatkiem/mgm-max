@@ -1,9 +1,33 @@
-import { Gift, Lock, Sparkles, Users } from "lucide-react";
-import { mot, q } from "@/db";
+import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { Gift, Lock, ShieldQuestion, Sparkles, Users } from "lucide-react";
+import { mot, q } from "@/db";
+import { layIp } from "@/services/http";
+import { soDangKyIpHomNay } from "@/services/nguoi-tham-gia";
+import { taoCaptcha, NGUONG_CAPTCHA } from "@/services/captcha";
 import DemNguoc from "@/ui/DemNguoc";
 
 export const dynamic = "force-dynamic";
+
+// F5 — OG metadata per campaign (crawler theo redirect từ /r/[ma] về đây)
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await props.params;
+  const cd = await mot(`select * from chien_dich where slug=$1`, [slug]);
+  if (!cd) return {};
+  const tieuDe = cd.og_tieu_de || cd.ten;
+  const moTa = cd.og_mo_ta || cd.mo_ta;
+  const anh = cd.og_anh || cd.anh_cover;
+  return {
+    title: tieuDe, description: moTa,
+    openGraph: { title: tieuDe, description: moTa, ...(anh ? { images: [anh] } : {}) },
+  };
+}
+
+function youtubeEmbed(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{6,})/);
+  return m ? `https://www.youtube.com/embed/${m[1]}` : null;
+}
 
 export default async function TrangDangKy(props: {
   params: Promise<{ slug: string }>;
@@ -13,6 +37,14 @@ export default async function TrangDangKy(props: {
   const { ref = "", loi = "" } = await props.searchParams;
   const cd = await mot(`select * from chien_dich where slug=$1`, [slug]);
   if (!cd) redirect("/");
+
+  // F11 — người quay lại: có cookie & đã xác minh → vào thẳng trang riêng
+  const kho = await cookies();
+  const maCu = kho.get(`mgm_toi_${cd.id}`)?.value;
+  if (maCu) {
+    const nguoiCu = await mot(`select ma from nguoi_tham_gia where ma=$1 and chien_dich_id=$2 and xac_minh and not chan`, [maCu, cd.id]);
+    if (nguoiCu) redirect(`/toi/${nguoiCu.ma}`);
+  }
 
   // Trang "campaign đã đóng" — vẫn hứng người đến muộn
   if (cd.trang_thai !== "chay") {
@@ -30,21 +62,44 @@ export default async function TrangDangKy(props: {
 
   const cacMoc = await q(`select nguong, ten_qua from moc_qua where chien_dich_id=$1 order by nguong`, [cd.id]);
   const soThamGia = await mot<{ so: string }>(`select count(*) as so from nguoi_tham_gia where chien_dich_id=$1 and xac_minh`, [cd.id]);
+  const video = cd.video_url ? youtubeEmbed(cd.video_url) : null;
+  const truongThem: { ten: string; bat_buoc: boolean }[] = cd.truong_them || [];
+
+  // F33 — captcha tự bật khi IP này đã đăng ký nhiều lần hôm nay
+  const ip = await layIp();
+  const canCaptcha = (await soDangKyIpHomNay(cd.id, ip)) >= NGUONG_CAPTCHA;
+  const captcha = canCaptcha ? taoCaptcha() : null;
+
+  const mau = cd.mau_chinh || "#2563eb";
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-600 via-blue-500 to-slate-50">
+    <main className="min-h-screen bg-slate-50" style={{ background: `linear-gradient(180deg, ${mau} 0%, ${mau}cc 38%, #f8fafc 62%)` }}>
       <div className="mx-auto max-w-xl px-4 py-12">
         <div className="text-center text-white">
+          {cd.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={cd.logo_url} alt="logo" className="mx-auto mb-3 h-12 w-auto rounded-lg bg-white/90 p-1.5" />
+          ) : null}
           <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold backdrop-blur">
             <Sparkles className="h-4 w-4" /> Mời bạn — nhận quà
           </div>
           <h1 className="mt-4 text-3xl font-black leading-tight sm:text-4xl">{cd.ten}</h1>
-          <p className="mt-3 text-blue-50">{cd.mo_ta}</p>
+          <p className="mt-3 text-white/85">{cd.mo_ta}</p>
           {cd.ket_thuc_luc && <div className="mt-4"><DemNguoc den={new Date(cd.ket_thuc_luc).toISOString()} /></div>}
-          <div className="mt-3 inline-flex items-center gap-1.5 text-sm text-blue-100">
+          <div className="mt-3 inline-flex items-center gap-1.5 text-sm text-white/80">
             <Users className="h-4 w-4" /> {Number(soThamGia?.so || 0)} người đã tham gia
           </div>
         </div>
+
+        {cd.anh_cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cd.anh_cover} alt="" className="mt-6 w-full rounded-2xl border-4 border-white/40 object-cover shadow-lg" />
+        ) : null}
+        {video && (
+          <div className="mt-6 overflow-hidden rounded-2xl border-4 border-white/40 shadow-lg">
+            <iframe src={video} className="aspect-video w-full" allow="autoplay; encrypted-media" allowFullScreen />
+          </div>
+        )}
 
         <div className="the mt-8 p-6 sm:p-8">
           {loi && <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{loi}</div>}
@@ -60,15 +115,28 @@ export default async function TrangDangKy(props: {
               <label className="nhan">Email</label>
               <input name="email" type="email" required maxLength={200} className="o-nhap" placeholder="ban@email.com" />
             </div>
+            {truongThem.map((t, i) => (
+              <div key={i}>
+                <label className="nhan">{t.ten}{t.bat_buoc ? " *" : ""}</label>
+                <input name={`them_${i}`} required={t.bat_buoc} maxLength={300} className="o-nhap" />
+              </div>
+            ))}
             <div>
               <label className="nhan">Mã giới thiệu (nếu có)</label>
               <input name="ma_gioi_thieu" defaultValue={ref} maxLength={12} className="o-nhap font-mono uppercase" placeholder="VD: ABC12345" />
             </div>
+            {captcha && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+                <label className="nhan !text-amber-800 flex items-center gap-1"><ShieldQuestion className="h-4 w-4" /> Câu hỏi xác nhận: {captcha.cauHoi}</label>
+                <input type="hidden" name="captcha_token" value={captcha.token} />
+                <input name="captcha_tra_loi" required inputMode="numeric" className="o-nhap" placeholder="Kết quả" />
+              </div>
+            )}
             <label className="flex items-start gap-2 text-xs text-slate-500">
               <input type="checkbox" required className="mt-0.5" />
               Tôi đồng ý nhận email của chương trình và điều khoản sử dụng. Có thể huỷ đăng ký bất cứ lúc nào.
             </label>
-            <button className="nut-chinh w-full text-base">
+            <button className="nut-chinh w-full text-base" style={{ backgroundColor: mau }}>
               <Gift className="h-5 w-5" /> Đăng ký nhận quà ngay
             </button>
           </form>
@@ -79,8 +147,8 @@ export default async function TrangDangKy(props: {
             <h2 className="font-bold text-slate-900">🎁 Mời càng nhiều — quà càng lớn</h2>
             <ul className="mt-3 space-y-2">
               {cacMoc.map((m) => (
-                <li key={m.nguong} className="flex items-center gap-3 rounded-xl bg-blue-50/60 px-4 py-2.5">
-                  <span className="hieu bg-blue-600 text-white">{m.nguong} bạn</span>
+                <li key={m.nguong} className="flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-2.5">
+                  <span className="hieu text-white" style={{ backgroundColor: mau }}>{m.nguong} bạn</span>
                   <span className="font-medium text-slate-700">{m.ten_qua}</span>
                 </li>
               ))}

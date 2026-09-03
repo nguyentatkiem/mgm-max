@@ -76,6 +76,13 @@ export const MAU_TOAN_DIEN: MauToanDien[] = [
       K.mocQua("🎁 Quà chắc chắn theo từng mốc"),
       K.dieuKhoan(),
     ]),
+    email: bo({
+      chaoMung: "Chào {{ten}},\n\nBạn đã có vé rồi! Mời bạn bè để nhân vé và mở khoá quà chắc chắn theo mốc.\nLink của bạn: {{link_rieng}}\n\n{{qua_chao_mung}}",
+      moi: "Tuyệt {{ten}}! Thêm 1 người = thêm vé cho bạn. Đang có {{so_ban}} bạn xác minh — càng nhiều điểm càng dễ trúng.\nMời tiếp: {{link_rieng}}",
+      sapMoc: "{{ten}} ơi, chỉ 1 bạn nữa là bạn nhận «{{qua_ke_tiep}}»! Gửi link ngay: {{link_rieng}}",
+      moQua: "🎁 Chúc mừng {{ten}}! Bạn vừa mở khoá: {{ten_qua}} {{gia_tri_qua}}\nXem tất cả quà: {{link_rieng}}",
+      trungGiai: "🏆 CHÚC MỪNG {{ten}}! Bạn đã trúng {{giai}}. Bọn mình sẽ liên hệ qua email này để trao giải. Trang của bạn: {{link_rieng}}",
+    }),
   },
 
   // 2) Danh sách chờ / ra mắt
@@ -116,6 +123,12 @@ export const MAU_TOAN_DIEN: MauToanDien[] = [
       K.mocQua("🎁 Mời bạn — lên hạng & mở khoá quà"),
       K.dieuKhoan(),
     ], { mauNen: "#f1f5f9", mauChinh: "#0f172a" }),
+    email: bo({
+      chaoMung: "Chào {{ten}},\n\nBạn đã vào danh sách chờ! Mời bạn bè để lên hạng ưu tiên và mở ưu đãi mở bán sớm.\nLink của bạn: {{link_rieng}}\n\n{{qua_chao_mung}}",
+      moi: "Cảm ơn {{ten}}! Bạn vừa lên hạng nhờ 1 người bạn. Đang có {{so_ban}} bạn — càng nhiều càng ưu tiên.\n{{link_rieng}}",
+      sapMoc: "{{ten}} ơi, chỉ 1 bạn nữa là bạn mở «{{qua_ke_tiep}}» trước ngày mở bán! {{link_rieng}}",
+      moQua: "🎁 {{ten}} vừa mở khoá đặc quyền sớm: {{ten_qua}} {{gia_tri_qua}}\nXem tại: {{link_rieng}}",
+    }),
   },
 
   // 3) Mốc quà evergreen
@@ -153,6 +166,12 @@ export const MAU_TOAN_DIEN: MauToanDien[] = [
       K.mocQua(),
       K.dieuKhoan(),
     ], { mauChinh: "#0d9488", mauNen: "#f0fdfa" }),
+    email: bo({
+      chaoMung: "Chào {{ten}},\n\nEmail đã xác nhận! Mời bạn bè để mở quà theo từng mốc — không cần hạn chót, mời lúc nào cũng được.\nLink của bạn: {{link_rieng}}\n\n{{qua_chao_mung}}",
+      moi: "Tuyệt {{ten}}! Một người bạn vừa xác minh qua bạn. Đang có {{so_ban}} bạn.\nMời tiếp để mở mốc kế: {{link_rieng}}",
+      sapMoc: "{{ten}} ơi, chỉ 1 bạn nữa là bạn mở «{{qua_ke_tiep}}»! Gửi link ngay: {{link_rieng}}",
+      moQua: "🎁 Chúc mừng {{ten}}! Bạn vừa mở khoá: {{ten_qua}} {{gia_tri_qua}}\nXem tất cả quà: {{link_rieng}}",
+    }),
   },
 
   // 4) Giới thiệu hai chiều
@@ -190,6 +209,12 @@ export const MAU_TOAN_DIEN: MauToanDien[] = [
       K.mocQua("🎁 Mời càng nhiều — quà càng lớn"),
       K.dieuKhoan(),
     ], { mauChinh: "#2563eb", mauNen: "#eff6ff" }),
+    email: bo({
+      chaoMung: "Chào {{ten}},\n\nĐây là link giới thiệu của bạn — mỗi người bạn mời, cả hai cùng nhận quà.\n{{link_rieng}}\n\n{{qua_chao_mung}}",
+      moi: "Cảm ơn {{ten}}! Một người bạn vừa nhận ưu đãi qua bạn, và bạn cũng tiến gần quà hơn. Đang có {{so_ban}} bạn.\n{{link_rieng}}",
+      sapMoc: "{{ten}} ơi, chỉ 1 bạn nữa là bạn nhận «{{qua_ke_tiep}}»! Gửi link ngay: {{link_rieng}}",
+      moQua: "🎁 {{ten}} vừa nhận: {{ten_qua}} {{gia_tri_qua}}\nCảm ơn bạn đã lan toả: {{link_rieng}}",
+    }),
   },
 
   // 5) Viral khoá học
@@ -229,6 +254,13 @@ export const MAU_TOAN_DIEN: MauToanDien[] = [
       K.mocQua("🎁 Mời bạn — mở khoá học liệu"),
       K.dieuKhoan(),
     ], { mauChinh: "#4f46e5", mauNen: "#eef2ff" }),
+    email: bo({
+      chaoMung: "Chào {{ten}},\n\nChào mừng học viên mới! Mời bạn bè cùng học để mở khoá học liệu, ưu đãi và cơ hội trúng suất học miễn phí.\nLink của bạn: {{link_rieng}}\n\n{{qua_chao_mung}}",
+      moi: "Giỏi lắm {{ten}}! Một người bạn vừa ghi danh qua bạn. Đang có {{so_ban}} bạn — càng nhiều điểm càng dễ trúng suất học miễn phí.\n{{link_rieng}}",
+      sapMoc: "{{ten}} ơi, chỉ 1 bạn nữa là bạn mở «{{qua_ke_tiep}}»! Gửi link ngay: {{link_rieng}}",
+      moQua: "🎁 Chúc mừng {{ten}}! Bạn vừa mở khoá: {{ten_qua}} {{gia_tri_qua}}\nVào học/nhận quà: {{link_rieng}}",
+      trungGiai: "🏆 CHÚC MỪNG {{ten}}! Bạn đã trúng {{giai}}. Bọn mình sẽ liên hệ để sắp xếp. Trang của bạn: {{link_rieng}}",
+    }),
   },
 
   // 6) Mua chung mở giá

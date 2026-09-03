@@ -1,8 +1,8 @@
-import { Mail, Save, Send, ShieldCheck } from "lucide-react";
+import { Mail, Save, Send, ShieldCheck, Sparkles, Webhook } from "lucide-react";
 import { layCaiDat } from "@/services/cai-dat";
-import { cheDoAI } from "@/services/ai";
+import { layCheDoAI } from "@/services/ai";
 import { yeuCauAdmin } from "../bao-ve";
-import { actLuuCaiDat, actGuiEmailTest } from "../actions";
+import { actLuuCaiDat, actGuiEmailTest, actGuiWebhookTest } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +15,16 @@ export default async function TrangCaiDat(props: { searchParams: Promise<{ test?
   const baseUrlAdmin = await layCaiDat("base_url");
   const emailFrom = await layCaiDat("email_from");
   const resendAdmin = await layCaiDat("resend_api_key");
+  const webhookGlobal = await layCaiDat("webhook_global");
+  const aiMode = await layCaiDat("ai_mode");
+  const claudeModel = await layCaiDat("claude_model");
+  const anthropicAdmin = await layCaiDat("anthropic_api_key");
   const coEnvBase = !!process.env.APP_BASE_URL;
   const coResendEnv = !!process.env.RESEND_API_KEY;
   const coResend = coResendEnv || !!resendAdmin;
-  const che = cheDoAI();
+  const coAnthropicEnv = !!process.env.ANTHROPIC_API_KEY;
+  const coAiModeEnv = !!process.env.MGM_AI_MODE;
+  const che = await layCheDoAI();
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -59,6 +65,43 @@ export default async function TrangCaiDat(props: { searchParams: Promise<{ test?
           </div>
         </div>
 
+        {/* Referral AI */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <div className="flex items-center gap-2 font-bold text-slate-900"><Sparkles className="h-4.5 w-4.5 text-violet-600" /> Referral AI (tạo chiến dịch bằng Claude)</div>
+          <p className="mt-1 text-xs text-slate-500">Mặc định dùng Claude CLI (gói subscription trên máy chủ). Muốn dùng API trả phí: chọn chế độ API + điền key.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="nhan">Chế độ</label>
+              <select name="ai_mode" defaultValue={aiMode} disabled={coAiModeEnv} className="o-nhap text-sm">
+                <option value="">Tự động (có key → API, không → CLI)</option>
+                <option value="cli">CLI (gói subscription)</option>
+                <option value="api">API (ANTHROPIC_API_KEY)</option>
+              </select>
+            </div>
+            <div>
+              <label className="nhan">Model</label>
+              <input name="claude_model" defaultValue={claudeModel} className="o-nhap font-mono text-sm" placeholder="claude-opus-5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <label className="nhan">ANTHROPIC_API_KEY (chỉ cần khi chế độ API)</label>
+            <input name="anthropic_api_key" type="password" autoComplete="off" disabled={coAnthropicEnv} className="o-nhap font-mono text-sm"
+              placeholder={coAnthropicEnv ? "Đang dùng biến môi trường ANTHROPIC_API_KEY" : anthropicAdmin ? "•••••• đã cấu hình — để trống nếu giữ nguyên" : "sk-ant-..."} />
+            {coAnthropicEnv ? (
+              <p className="mt-1 text-xs text-slate-400">Đang lấy từ biến môi trường (ưu tiên cao nhất).</p>
+            ) : anthropicAdmin ? (
+              <label className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500"><input type="checkbox" name="xoa_anthropic" /> Xoá key hiện tại</label>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Webhook toàn hệ thống */}
+        <div>
+          <label className="nhan flex items-center gap-1.5"><Webhook className="h-4 w-4 text-slate-500" /> Webhook toàn hệ thống (nhận mọi sự kiện của mọi chiến dịch)</label>
+          <input name="webhook_global" defaultValue={webhookGlobal} className="o-nhap font-mono text-sm" placeholder="https://he-thong-cua-anh.vn/webhook" />
+          <p className="mt-1 text-xs text-slate-400">Bắn kèm ngoài webhook riêng của từng chiến dịch. Sự kiện: lead.xac_minh · gioi_thieu.xac_minh · moc.mo_khoa · boc_tham.trung_giai.</p>
+        </div>
+
         <div>
           <label className="nhan">Whitelist IP (mỗi IP một dòng)</label>
           <textarea name="whitelist_ip" rows={3} defaultValue={whitelistIp} className="o-nhap font-mono text-sm" placeholder="IP của đội vận hành — để tự test không dính giới hạn 3 đăng ký/IP/ngày" />
@@ -82,6 +125,16 @@ export default async function TrangCaiDat(props: { searchParams: Promise<{ test?
           <p className="mt-1 text-xs text-slate-400">{coResend ? "Gửi thật ngay để kiểm cấu hình. Với onboarding@resend.dev chỉ gửi được tới email tài khoản Resend." : "Điền API key ở trên và Lưu trước khi gửi test."}</p>
         </div>
         <button className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 font-bold text-white hover:bg-slate-900 cursor-pointer"><Send className="h-4 w-4" /> Gửi test</button>
+      </form>
+
+      {/* Bắn webhook test */}
+      <form action={actGuiWebhookTest} className="the mt-5 flex flex-wrap items-end gap-3 p-6">
+        <div className="flex-1">
+          <label className="nhan">Bắn webhook test tới</label>
+          <input name="webhook_test" defaultValue={webhookGlobal} className="o-nhap font-mono text-sm" placeholder="https://he-thong-cua-anh.vn/webhook" />
+          <p className="mt-1 text-xs text-slate-400">Gửi 1 sự kiện <code className="font-mono">test.ping</code> để kiểm máy chủ có nhận không.</p>
+        </div>
+        <button className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 font-bold text-white hover:bg-slate-900 cursor-pointer"><Webhook className="h-4 w-4" /> Bắn test</button>
       </form>
 
       <div className="the mt-5 p-6 text-sm text-slate-600">

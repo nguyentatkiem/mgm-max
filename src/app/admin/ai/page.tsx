@@ -1,6 +1,6 @@
 import { Sparkles, TerminalSquare } from "lucide-react";
 import { yeuCauAdmin } from "../bao-ve";
-import { cheDoAI } from "@/services/ai";
+import { layCheDoAI } from "@/services/ai";
 import { actTaoBangAI } from "../actions";
 import NutSinh from "./NutSinh";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function TrangAI(props: { searchParams: Promise<{ loi?: string }> }) {
   await yeuCauAdmin();
   const { loi } = await props.searchParams;
-  const che = cheDoAI();
+  const che = await layCheDoAI();
 
   return (
     <div className="mx-auto max-w-xl px-4 py-6">

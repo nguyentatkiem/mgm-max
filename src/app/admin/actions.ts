@@ -7,6 +7,7 @@ import { dangNhapAdmin, dangXuatAdmin, laAdmin } from "@/services/auth";
 import { ghiCaiDat } from "@/services/cai-dat";
 import { ghiDiem } from "@/services/diem";
 import { render, xuLyHangDoi, guiEmailTest } from "@/services/email";
+import { guiWebhookTest } from "@/services/webhook";
 import { dangKyNhanh, xacNhanGioiThieu } from "@/services/nguoi-tham-gia";
 import { chayBocTham, chiDinhWinner, duyetBocTham } from "@/services/boc-tham-svc";
 import { taoChienDichBangAI } from "@/services/ai";
@@ -236,6 +237,14 @@ export async function actLuuCaiDat(form: FormData) {
   const rk = String(form.get("resend_api_key") || "").trim();
   if (form.get("xoa_resend")) await ghiCaiDat("resend_api_key", "");
   else if (rk) await ghiCaiDat("resend_api_key", rk);
+  // Webhook toàn hệ thống (bắn kèm mọi sự kiện, ngoài webhook riêng của chiến dịch)
+  await ghiCaiDat("webhook_global", String(form.get("webhook_global") || "").trim());
+  // Referral AI — chế độ / model / API key
+  await ghiCaiDat("ai_mode", String(form.get("ai_mode") || "").trim());
+  await ghiCaiDat("claude_model", String(form.get("claude_model") || "").trim());
+  const ak = String(form.get("anthropic_api_key") || "").trim();
+  if (form.get("xoa_anthropic")) await ghiCaiDat("anthropic_api_key", "");
+  else if (ak) await ghiCaiDat("anthropic_api_key", ak);
   revalidatePath("/admin/cai-dat");
 }
 
@@ -246,6 +255,14 @@ export async function actGuiEmailTest(form: FormData) {
   if (!to) redirect(`/admin/cai-dat?test=${encodeURIComponent("Chưa nhập email nhận")}`);
   const kq = await guiEmailTest(to);
   redirect(`/admin/cai-dat?test=${encodeURIComponent((kq.ok ? "✅ " : "❌ ") + kq.thongTin)}`);
+}
+
+// Bắn 1 webhook test để kiểm kết nối (nút trong Cài đặt).
+export async function actGuiWebhookTest(form: FormData) {
+  await canAdmin();
+  const url = String(form.get("webhook_test") || "").trim();
+  const kq = await guiWebhookTest(url);
+  redirect(`/admin/cai-dat?test=${encodeURIComponent((kq.ok ? "✅ Webhook: " : "❌ Webhook: ") + kq.thongTin)}`);
 }
 
 // ————— F1/F5/F7/F44 — giao diện, share message, trường form, webhook —————

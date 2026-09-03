@@ -1,6 +1,7 @@
 import { Plug, Save, Webhook } from "lucide-react";
 import { mot } from "@/db";
-import { cheDoAI } from "@/services/ai";
+import { layCheDoAI } from "@/services/ai";
+import { layCaiDat } from "@/services/cai-dat";
 import { actSuaGiaoDien } from "../../../../../actions";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +9,8 @@ export const dynamic = "force-dynamic";
 export default async function KetNoi(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params;
   const cd = await mot(`select * from chien_dich where id=$1`, [Number(id)]);
-  const coResend = !!process.env.RESEND_API_KEY;
-  const che = cheDoAI();
+  const coResend = !!process.env.RESEND_API_KEY || !!(await layCaiDat("resend_api_key"));
+  const che = await layCheDoAI();
 
   return (
     <div>

@@ -6,6 +6,7 @@
 import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import Anthropic from "@anthropic-ai/sdk";
+import { layCaiDat } from "@/services/cai-dat";
 
 export type SpecChienDich = {
   ten: string; slug: string; mo_ta: string;
@@ -15,15 +16,21 @@ export type SpecChienDich = {
   loi_moi: Record<string, string>;
 };
 
-const MODEL_AI = process.env.CLAUDE_MODEL || "claude-opus-5";
-
 export type CheDoAI = "api" | "cli" | "none";
 
-export function cheDoAI(): CheDoAI {
-  const ep = (process.env.MGM_AI_MODE || "").toLowerCase();
+// Chế độ AI: env ưu tiên, sau đó admin đặt trong Cài đặt (ai_mode/anthropic_api_key).
+export async function layCheDoAI(): Promise<CheDoAI> {
+  const ep = (process.env.MGM_AI_MODE || (await layCaiDat("ai_mode")) || "").toLowerCase();
   if (ep === "api") return "api";
   if (ep === "cli") return "cli";
-  return process.env.ANTHROPIC_API_KEY ? "api" : "cli";
+  const key = process.env.ANTHROPIC_API_KEY || (await layCaiDat("anthropic_api_key"));
+  return key ? "api" : "cli";
+}
+async function khoaAI(): Promise<string> {
+  return process.env.ANTHROPIC_API_KEY || (await layCaiDat("anthropic_api_key")) || "";
+}
+async function modelAI(): Promise<string> {
+  return process.env.CLAUDE_MODEL || (await layCaiDat("claude_model")) || "claude-opus-5";
 }
 
 /** Bóc JSON từ output text (bỏ fence markdown, lấy khối {..}, dọn dấu phẩy thừa). */
@@ -67,8 +74,8 @@ Thông tin doanh nghiệp:
 }
 
 /** Gọi CLI `claude` (gói sub). Trả về chuỗi text kết quả (là JSON của chiến dịch). */
-function goiCli(prompt: string): Promise<string> {
-  const args = ["-p", prompt, "--output-format", "json", "--model", MODEL_AI];
+function goiCli(prompt: string, model: string): Promise<string> {
+  const args = ["-p", prompt, "--output-format", "json", "--model", model];
   const opts = { timeout: 180_000, maxBuffer: 16 * 1024 * 1024, env: process.env };
   const chay = (bin: string) =>
     new Promise<string>((resolve, reject) => {
@@ -91,11 +98,11 @@ function goiCli(prompt: string): Promise<string> {
 }
 
 /** Gọi SDK (API key). */
-async function goiApi(prompt: string): Promise<string> {
-  const client = new Anthropic();
+async function goiApi(prompt: string, model: string, key: string): Promise<string> {
+  const client = new Anthropic(key ? { apiKey: key } : {});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const res: any = await client.messages.create({
-    model: MODEL_AI, max_tokens: 8000,
+    model, max_tokens: 8000,
     messages: [{ role: "user", content: prompt }],
   });
   if (res.stop_reason === "refusal") throw new Error("Yêu cầu bị bộ lọc an toàn từ chối — thử mô tả sản phẩm/quà khác đi.");
@@ -107,12 +114,14 @@ export async function taoChienDichBangAI(input: {
   thuongHieu: string; website: string; sanPham: string; doiTuong: string; ganeQua: string;
 }): Promise<{ ok: true; spec: SpecChienDich } | { ok: false; loi: string }> {
   const prompt = dungPrompt(input);
-  const che = cheDoAI();
+  const che = await layCheDoAI();
+  const model = await modelAI();
+  const key = await khoaAI();
   let loiCuoi = "";
   // Model đôi khi in JSON lỗi (ngoặc kép lồng) — thử lại tối đa 3 lần, mỗi lần sinh độc lập.
   for (let lan = 1; lan <= 3; lan++) {
     try {
-      const text = che === "api" ? await goiApi(prompt) : await goiCli(prompt);
+      const text = che === "api" ? await goiApi(prompt, model, key) : await goiCli(prompt, model);
       if (!text.trim()) { loiCuoi = "AI trả kết quả rỗng"; continue; }
       try {
         const spec = JSON.parse(bocJson(text)) as SpecChienDich;

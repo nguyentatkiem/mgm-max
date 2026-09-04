@@ -75,9 +75,9 @@ create index if not exists idx_click_ma on click_link(ma);
 
 create table if not exists gioi_thieu (
   id               serial primary key,
-  chien_dich_id    int not null,
-  nguoi_moi_id     int not null references nguoi_tham_gia(id),
-  nguoi_duoc_moi_id int not null unique references nguoi_tham_gia(id),  -- 1 người chỉ 1 người mời
+  chien_dich_id    int not null references chien_dich(id) on delete cascade,
+  nguoi_moi_id     int not null references nguoi_tham_gia(id) on delete cascade,
+  nguoi_duoc_moi_id int not null unique references nguoi_tham_gia(id) on delete cascade,  -- 1 người chỉ 1 người mời
   trang_thai       text not null default 'cho',        -- cho | xac_minh | cach_ly | huy
   diem_rui_ro      int not null default 0,
   ly_do_cach_ly    text not null default '',

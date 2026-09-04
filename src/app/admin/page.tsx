@@ -3,6 +3,7 @@ import { AlertTriangle, CalendarClock, Copy, Eye, Gift, MousePointerClick, Plus,
 import { mot, q } from "@/db";
 import { yeuCauAdmin } from "./bao-ve";
 import { actCloneChienDich, actDoiTrangThai } from "./actions";
+import NutXoaChienDich from "@/ui/admin/NutXoaChienDich";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,7 @@ export default async function TongQuanTaiKhoan() {
                     <form action={actDoiTrangThai}><input type="hidden" name="id" value={cd.id} /><input type="hidden" name="trang_thai" value="tam_dung" />
                       <button className="nut-phu !px-2.5 !py-1.5 text-[10px]">Dừng</button></form>
                   )}
+                  <NutXoaChienDich id={cd.id} ten={cd.ten} />
                 </div>
               </div>
             </div>

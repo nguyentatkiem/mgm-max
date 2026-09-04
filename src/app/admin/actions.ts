@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { mot, q } from "@/db";
+import { mot, pool, q } from "@/db";
 import { dangNhapAdmin, dangXuatAdmin, laAdmin } from "@/services/auth";
 import { ghiCaiDat } from "@/services/cai-dat";
 import { ghiDiem } from "@/services/diem";
@@ -105,7 +105,11 @@ export async function actThemMoc(form: FormData) {
 
 export async function actXoaMoc(form: FormData) {
   await canAdmin();
-  await q(`delete from moc_qua where id=$1`, [Number(form.get("id"))]);
+  const id = Number(form.get("id"));
+  // Quà đã trao giữ lại lịch sử (ten_qua đã lưu sẵn), chỉ gỡ liên kết mốc —
+  // nếu không FK qua_da_trao.moc_id chặn xoá mốc đã có người đạt.
+  await q(`update qua_da_trao set moc_id=null where moc_id=$1`, [id]);
+  await q(`delete from moc_qua where id=$1`, [id]);
   revalidatePath(`/admin/chien-dich/${Number(form.get("chien_dich_id"))}`);
 }
 
@@ -571,7 +575,28 @@ export async function actSuaHeaderCodes(form: FormData) {
 
 export async function actXoaChienDich(form: FormData) {
   await canAdmin();
-  await q(`delete from chien_dich where id=$1`, [Number(form.get("id"))]);
+  const id = Number(form.get("id"));
+  // Xoá theo thứ tự tường minh trong 1 transaction: gioi_thieu / qua_da_trao.moc_id /
+  // hang_doi_email / click_link không có FK cascade đầy đủ, để cascade tự lo sẽ bị
+  // Postgres chặn vì khoá ngoại (thứ tự trigger không đảm bảo).
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const nguoi = `select id from nguoi_tham_gia where chien_dich_id=$1`;
+    await client.query(`delete from click_link where ma in (select ma from nguoi_tham_gia where chien_dich_id=$1)`, [id]);
+    await client.query(`delete from so_diem where nguoi_id in (${nguoi})`, [id]);
+    await client.query(`delete from qua_da_trao where nguoi_id in (${nguoi})`, [id]);
+    await client.query(`delete from gioi_thieu where chien_dich_id=$1`, [id]);
+    await client.query(`delete from hang_doi_email where chien_dich_id=$1`, [id]);
+    await client.query(`delete from nguoi_tham_gia where chien_dich_id=$1`, [id]);
+    await client.query(`delete from chien_dich where id=$1`, [id]);
+    await client.query("commit");
+  } catch (e) {
+    await client.query("rollback");
+    throw e;
+  } finally {
+    client.release();
+  }
   redirect("/admin");
 }
 
